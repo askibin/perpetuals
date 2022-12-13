@@ -1,4 +1,4 @@
-//! SetTestTime instruction handler
+//! DeletePool instruction handler
 
 use {
     crate::{
@@ -6,13 +6,14 @@ use {
         state::{
             multisig::{AdminInstruction, Multisig},
             perpetuals::Perpetuals,
+            pool::Pool,
         },
     },
     anchor_lang::prelude::*,
 };
 
 #[derive(Accounts)]
-pub struct SetTestTime<'info> {
+pub struct DeletePool<'info> {
     #[account()]
     pub admin: Signer<'info>,
 
@@ -23,34 +24,44 @@ pub struct SetTestTime<'info> {
     )]
     pub multisig: AccountLoader<'info, Multisig>,
 
+    /// CHECK: empty PDA, authority for token accounts
+    #[account(
+        seeds = [b"transfer_authority"],
+        bump = perpetuals.transfer_authority_bump
+    )]
+    pub transfer_authority: AccountInfo<'info>,
+
     #[account(
         mut,
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
     )]
     pub perpetuals: Box<Account<'info, Perpetuals>>,
+
+    #[account(
+        mut,
+        seeds = [b"pool",
+                 pool.name.as_bytes()],
+        bump = pool.bump,
+        close = transfer_authority
+    )]
+    pub pool: Box<Account<'info, Pool>>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct SetTestTimeParams {
-    pub time: i64,
-}
+pub struct DeletePoolParams {}
 
-pub fn set_test_time<'info>(
-    ctx: Context<'_, '_, '_, 'info, SetTestTime<'info>>,
-    params: &SetTestTimeParams,
+pub fn delete_pool<'info>(
+    ctx: Context<'_, '_, '_, 'info, DeletePool<'info>>,
+    params: &DeletePoolParams,
 ) -> Result<u8> {
-    if !cfg!(feature = "test") {
-        return err!(PerpetualsError::InvalidEnvironment);
-    }
-
     // validate signatures
     let mut multisig = ctx.accounts.multisig.load_mut()?;
 
     let signatures_left = multisig.sign_multisig(
         &ctx.accounts.admin,
         &Multisig::get_account_infos(&ctx)[1..],
-        &Multisig::get_instruction_data(AdminInstruction::SetTestTime, params)?,
+        &Multisig::get_instruction_data(AdminInstruction::DeletePool, params)?,
     )?;
     if signatures_left > 0 {
         msg!(
@@ -60,10 +71,10 @@ pub fn set_test_time<'info>(
         return Ok(signatures_left);
     }
 
-    // update time data
-    if cfg!(feature = "test") {
-        ctx.accounts.perpetuals.inception_time = params.time;
-    }
+    require!(
+        ctx.accounts.pool.tokens.is_empty(),
+        PerpetualsError::InvalidPoolState
+    );
 
     Ok(0)
 }

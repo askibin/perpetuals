@@ -2,10 +2,10 @@
 
 use {
     crate::state::{
-        auction::Auction,
         custody::Custody,
         multisig::{AdminInstruction, Multisig},
         oracle::TestOracle,
+        perpetuals::Perpetuals,
     },
     anchor_lang::prelude::*,
 };
@@ -23,11 +23,10 @@ pub struct SetTestOraclePrice<'info> {
     pub multisig: AccountLoader<'info, Multisig>,
 
     #[account(
-        seeds = [b"auction",
-                 auction.common.name.as_bytes()],
-        bump = auction.bump
+        seeds = [b"perpetuals"],
+        bump = perpetuals.perpetuals_bump
     )]
-    pub auction: Box<Account<'info, Auction>>,
+    pub perpetuals: Box<Account<'info, Perpetuals>>,
 
     #[account(
         seeds = [b"custody",
@@ -43,7 +42,7 @@ pub struct SetTestOraclePrice<'info> {
         constraint = oracle_account.key() == custody.oracle_account,
         seeds = [b"oracle_account",
                  custody.mint.as_ref(),
-                 auction.key().as_ref()],
+                 perpetuals.key().as_ref()],
         bump
     )]
     pub oracle_account: Box<Account<'info, TestOracle>>,

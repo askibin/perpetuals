@@ -33,8 +33,4 @@ pub struct Position {
 
 impl Position {
     pub const LEN: usize = 8 + std::mem::size_of::<Position>();
-
-    pub fn get_pnl(&self) -> Result<u64> {
-        Ok(0)
-    }
 }

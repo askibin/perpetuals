@@ -24,14 +24,20 @@ pub enum PerpetualsError {
     InvalidOraclePrice,
     #[msg("Instruction is not allowed in production")]
     InvalidEnvironment,
+    #[msg("Invalid pool state")]
+    InvalidPoolState,
     #[msg("Invalid perpetuals config")]
     InvalidPerpetualsConfig,
+    #[msg("Not enough tokens returned")]
+    InsufficientAmountReturned,
     #[msg("Price slippage limit exceeded")]
     MaxPriceSlippage,
     #[msg("Position leverage limit exceeded")]
     MaxLeverage,
     #[msg("Pool amount limit exceeded")]
-    MaxPoolAmount,
+    PoolAmountLimit,
     #[msg("Token is not supported")]
     UnsupportedToken,
+    #[msg("Instruction is not allowed at this time")]
+    InstructionNotAllowed,
 }

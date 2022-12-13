@@ -1,4 +1,4 @@
-//! SetOracleConfig instruction handler
+//! SetTokenConfig instruction handler
 
 use {
     crate::{
@@ -13,7 +13,7 @@ use {
 };
 
 #[derive(Accounts)]
-pub struct SetOracleConfig<'info> {
+pub struct SetTokenConfig<'info> {
     #[account()]
     pub admin: Signer<'info>,
 
@@ -34,16 +34,16 @@ pub struct SetOracleConfig<'info> {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct SetOracleConfigParams {
+pub struct SetTokenConfigParams {
     pub max_oracle_price_error: f64,
     pub max_oracle_price_age_sec: u32,
     pub oracle_type: OracleType,
     pub oracle_account: Pubkey,
 }
 
-pub fn set_oracle_config<'info>(
-    ctx: Context<'_, '_, '_, 'info, SetOracleConfig<'info>>,
-    params: &SetOracleConfigParams,
+pub fn set_token_config<'info>(
+    ctx: Context<'_, '_, '_, 'info, SetTokenConfig<'info>>,
+    params: &SetTokenConfigParams,
 ) -> Result<u8> {
     // validate signatures
     let mut multisig = ctx.accounts.multisig.load_mut()?;
@@ -51,7 +51,7 @@ pub fn set_oracle_config<'info>(
     let signatures_left = multisig.sign_multisig(
         &ctx.accounts.admin,
         &Multisig::get_account_infos(&ctx)[1..],
-        &Multisig::get_instruction_data(AdminInstruction::SetOracleConfig, params)?,
+        &Multisig::get_instruction_data(AdminInstruction::SetTokenConfig, params)?,
     )?;
     if signatures_left > 0 {
         msg!(
@@ -68,9 +68,9 @@ pub fn set_oracle_config<'info>(
     custody.oracle_type = params.oracle_type;
     custody.oracle_account = params.oracle_account;
 
-    if !custody.validate() {
-        err!(PerpetualsError::InvalidCustodyConfig)
-    } else {
-        Ok(0)
-    }
+    //if !custody.validate() {
+    //err!(PerpetualsError::InvalidCustodyConfig)
+    //} else {
+    Ok(0)
+    //}
 }

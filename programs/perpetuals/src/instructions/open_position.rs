@@ -6,7 +6,7 @@ use {
         math,
         state::{
             custody::Custody,
-            multisig::Multisig,
+            oracle::OraclePrice,
             perpetuals::Perpetuals,
             pool::Pool,
             position::{Position, Side},
@@ -14,7 +14,7 @@ use {
     },
     anchor_lang::prelude::*,
     anchor_spl::token::{Token, TokenAccount},
-    solana_program::{program, program_error::ProgramError},
+    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]
@@ -25,7 +25,7 @@ pub struct OpenPosition<'info> {
 
     #[account(
         mut,
-        constraint = funding_account.mint == collateral_custody.mint,
+        constraint = funding_account.mint == custody.mint,
         has_one = owner
     )]
     pub funding_account: Box<Account<'info, TokenAccount>>,
@@ -59,7 +59,7 @@ pub struct OpenPosition<'info> {
         seeds = [b"position",
                  owner.key().as_ref(),
                  pool.key().as_ref(),
-                 collateral_custody.key().as_ref(),
+                 custody.key().as_ref(),
                  &[params.side as u8]],
         bump
     )]
@@ -67,20 +67,20 @@ pub struct OpenPosition<'info> {
 
     #[account(
         seeds = [b"custody",
-                 collateral_custody.mint.as_ref()],
-        bump = collateral_custody.bump
+                 custody.mint.as_ref()],
+        bump = custody.bump
     )]
-    pub collateral_custody: Box<Account<'info, Custody>>,
+    pub custody: Box<Account<'info, Custody>>,
 
     /// CHECK: oracle account for the collateral token
     #[account(
-        constraint = custody_oracle_account.key() == collateral_custody.oracle_account
+        constraint = custody_oracle_account.key() == custody.oracle_account
     )]
     pub custody_oracle_account: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = custody_token_account.key() == collateral_custody.token_account.key()
+        constraint = custody_token_account.key() == custody.token_account.key()
     )]
     pub custody_token_account: Box<Account<'info, TokenAccount>>,
 
@@ -100,11 +100,15 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     // check permissions
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
-    let position = ctx.accounts.position.as_mut();
-    let pool = ctx.accounts.pool.as_mut();
+    require!(
+        perpetuals.permissions.allow_open_position,
+        PerpetualsError::InstructionNotAllowed
+    );
 
     // validate inputs
     msg!("Validate inputs");
+    let position = ctx.accounts.position.as_mut();
+    let pool = ctx.accounts.pool.as_mut();
     if params.price == 0
         || (params.collateral == 0 && position.time == 0)
         || params.size == 0
@@ -113,11 +117,20 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     {
         return Err(ProgramError::InvalidArgument.into());
     }
-    let token_id = pool.get_token_id(&ctx.accounts.collateral_custody.key())?;
+    let token_id = pool.get_token_id(&ctx.accounts.custody.key())?;
 
     // compute position price
-    let position_price = pool.get_entry_price(token_id, params.side)?;
-    msg!("Trade price: {}", position_price);
+    let curtime = perpetuals.get_time()?;
+    let custody = ctx.accounts.custody.as_mut();
+    let token_price = OraclePrice::new_from_oracle(
+        custody.oracle_type,
+        &ctx.accounts.custody.to_account_info(),
+        custody.max_oracle_price_error,
+        custody.max_oracle_price_age_sec,
+        curtime,
+    )?;
+    let position_price = pool.get_entry_price(token_id, &token_price, params.side)?;
+    msg!("Entry price: {}", position_price);
     if params.side == Side::Long {
         require_gte!(
             params.price,
@@ -135,24 +148,17 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     // compute fee
     let fee = pool.get_entry_fee(token_id, params.side, params.size)?;
     let fee_amount = fee.get_fee_amount(params.size)?;
-    msg!("Trade fee: {}", fee_amount);
+    msg!("Collected fee: {}", fee_amount);
 
-    // check user balance
-    msg!("Check user balance");
+    // compute amount to transfer
     let transfer_amount = math::checked_add(params.collateral, fee_amount)?;
-    if ctx.accounts.funding_account.amount < transfer_amount {
-        return Err(ProgramError::InsufficientFunds.into());
-    }
+    msg!("Amount in: {}", transfer_amount);
 
     // check pool constraints
     msg!("Check pool constraints");
-    let amount_limit = pool.get_amount_limit(token_id)?;
-    let new_pool_amount =
-        math::checked_add(ctx.accounts.custody_token_account.amount, transfer_amount)?;
-    require_gte!(
-        amount_limit,
-        new_pool_amount,
-        PerpetualsError::MaxPoolAmount
+    require!(
+        pool.check_amount_in(token_id, transfer_amount)?,
+        PerpetualsError::PoolAmountLimit
     );
 
     if position.time == 0 {
@@ -183,7 +189,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         // save accumulated interest nad pnl
         position.interest_debt =
             math::checked_add(pool.get_interest_amount(position)?, position.interest_debt)?;
-        position.unrealized_pnl = math::checked_add(position.get_pnl()?, position.unrealized_pnl)?;
+        position.unrealized_pnl =
+            math::checked_add(pool.get_pnl(position)?, position.unrealized_pnl)?;
 
         position.time = perpetuals.get_time()?;
         position.price = position_price;
@@ -198,14 +205,35 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     // lock funds for potential profit payoff
     pool.lock_funds(params.size)?;
 
-    // update user stats
-    msg!("Update user stats");
+    // transfer tokens
+    msg!("Transfer tokens");
+    perpetuals.transfer_tokens_from_user(
+        ctx.accounts.funding_account.to_account_info(),
+        ctx.accounts.custody_token_account.to_account_info(),
+        ctx.accounts.owner.to_account_info(),
+        ctx.accounts.token_program.to_account_info(),
+        transfer_amount,
+    )?;
 
     // update pool stats
     msg!("Update pool stats");
+    custody.collected_fees.open_position = math::checked_add(
+        custody.collected_fees.open_position,
+        token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
+    )?;
+    custody.volume_stats.open_position = math::checked_add(
+        custody.volume_stats.open_position,
+        token_price.get_asset_amount_usd(params.size, custody.decimals)?,
+    )?;
 
-    // update protocol stats
-    msg!("Update protocol stats");
+    custody.fee_amount = math::checked_add(custody.fee_amount, fee_amount)?;
+
+    if params.side == Side::Long {
+        custody.trade_stats.oi_long = math::checked_add(custody.trade_stats.oi_long, params.size)?;
+    } else {
+        custody.trade_stats.oi_short =
+            math::checked_add(custody.trade_stats.oi_short, params.size)?;
+    }
 
     Ok(())
 }

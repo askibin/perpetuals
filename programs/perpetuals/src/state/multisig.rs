@@ -23,15 +23,17 @@ pub struct Multisig {
 }
 
 pub enum AdminInstruction {
-    InitCustody,
-    SetPermissions,
-    SetFees,
+    InitPool,
+    DeletePool,
+    AddToken,
+    RemoveToken,
     SetAdminSigners,
-    SetOracleConfig,
+    SetPoolConfig,
+    SetTokenConfig,
+    SetPermissions,
     WithdrawFees,
     SetTestOraclePrice,
     SetTestTime,
-    DeleteAuction,
 }
 
 impl Multisig {
