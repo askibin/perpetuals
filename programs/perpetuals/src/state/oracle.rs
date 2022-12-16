@@ -9,7 +9,7 @@ const ORACLE_EXPONENT_SCALE: i32 = -9;
 const ORACLE_PRICE_SCALE: u64 = 1_000_000_000;
 const ORACLE_MAX_PRICE: u64 = (1 << 28) - 1;
 
-#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Debug)]
 pub enum OracleType {
     None,
     Test,
@@ -22,7 +22,7 @@ impl Default for OracleType {
     }
 }
 
-#[derive(Copy, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct OraclePrice {
     pub price: u64,
     pub exponent: i32,

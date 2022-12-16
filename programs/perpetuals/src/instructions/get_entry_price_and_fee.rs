@@ -6,17 +6,16 @@ use {
         oracle::OraclePrice,
         perpetuals::{Perpetuals, PriceAndFee},
         pool::Pool,
-        position::{Position, Side},
+        position::Side,
     },
     anchor_lang::prelude::*,
-    anchor_spl::token::{Token, TokenAccount},
-    solana_program::{program, program_error::ProgramError},
+    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]
 pub struct GetEntryPriceAndFee<'info> {
     #[account()]
-    pub owner: Signer<'info>,
+    pub signer: Signer<'info>,
 
     #[account(
         seeds = [b"perpetuals"],
@@ -33,6 +32,7 @@ pub struct GetEntryPriceAndFee<'info> {
 
     #[account(
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
         bump = custody.bump
     )]
@@ -40,7 +40,7 @@ pub struct GetEntryPriceAndFee<'info> {
 
     /// CHECK: oracle account for the collateral token
     #[account(
-        constraint = custody_oracle_account.key() == custody.oracle_account
+        constraint = custody_oracle_account.key() == custody.oracle.oracle_account
     )]
     pub custody_oracle_account: AccountInfo<'info>,
 }
@@ -66,10 +66,10 @@ pub fn get_entry_price_and_fee(
     let curtime = ctx.accounts.perpetuals.get_time()?;
     let custody = ctx.accounts.custody.as_mut();
     let token_price = OraclePrice::new_from_oracle(
-        custody.oracle_type,
-        &ctx.accounts.custody.to_account_info(),
-        custody.max_oracle_price_error,
-        custody.max_oracle_price_age_sec,
+        custody.oracle.oracle_type,
+        &custody.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let position_price = pool.get_entry_price(token_id, &token_price, params.side)?;

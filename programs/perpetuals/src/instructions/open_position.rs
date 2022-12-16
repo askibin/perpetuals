@@ -38,7 +38,6 @@ pub struct OpenPosition<'info> {
     pub transfer_authority: AccountInfo<'info>,
 
     #[account(
-        mut,
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
     )]
@@ -66,7 +65,9 @@ pub struct OpenPosition<'info> {
     pub position: Box<Account<'info, Position>>,
 
     #[account(
+        mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
         bump = custody.bump
     )]
@@ -74,13 +75,16 @@ pub struct OpenPosition<'info> {
 
     /// CHECK: oracle account for the collateral token
     #[account(
-        constraint = custody_oracle_account.key() == custody.oracle_account
+        constraint = custody_oracle_account.key() == custody.oracle.oracle_account
     )]
     pub custody_oracle_account: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = custody_token_account.key() == custody.token_account.key()
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 custody.mint.as_ref()],
+        bump = custody.token_account_bump
     )]
     pub custody_token_account: Box<Account<'info, TokenAccount>>,
 
@@ -100,8 +104,9 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     // check permissions
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
+    let custody = ctx.accounts.custody.as_mut();
     require!(
-        perpetuals.permissions.allow_open_position,
+        perpetuals.permissions.allow_open_position && custody.permissions.allow_open_position,
         PerpetualsError::InstructionNotAllowed
     );
 
@@ -117,16 +122,15 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     {
         return Err(ProgramError::InvalidArgument.into());
     }
-    let token_id = pool.get_token_id(&ctx.accounts.custody.key())?;
+    let token_id = pool.get_token_id(&custody.key())?;
 
     // compute position price
     let curtime = perpetuals.get_time()?;
-    let custody = ctx.accounts.custody.as_mut();
     let token_price = OraclePrice::new_from_oracle(
-        custody.oracle_type,
-        &ctx.accounts.custody.to_account_info(),
-        custody.max_oracle_price_error,
-        custody.max_oracle_price_age_sec,
+        custody.oracle.oracle_type,
+        &custody.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let position_price = pool.get_entry_price(token_id, &token_price, params.side)?;
@@ -226,7 +230,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         token_price.get_asset_amount_usd(params.size, custody.decimals)?,
     )?;
 
-    custody.fee_amount = math::checked_add(custody.fee_amount, fee_amount)?;
+    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
 
     if params.side == Side::Long {
         custody.trade_stats.oi_long = math::checked_add(custody.trade_stats.oi_long, params.size)?;

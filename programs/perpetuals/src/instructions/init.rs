@@ -7,7 +7,7 @@ use {
     },
     anchor_lang::prelude::*,
     anchor_spl::token::Token,
-    solana_program::{program, program_error::ProgramError, sysvar},
+    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]
@@ -43,6 +43,16 @@ pub struct Init<'info> {
     )]
     pub perpetuals: Box<Account<'info, Perpetuals>>,
 
+    #[account(
+        constraint = perpetuals_program.programdata_address()? == Some(perpetuals_program_data.key())
+    )]
+    pub perpetuals_program: Program<'info, Perpetuals>,
+
+    #[account(
+        constraint = perpetuals_program_data.upgrade_authority_address == Some(upgrade_authority.key())
+    )]
+    pub perpetuals_program_data: Account<'info, ProgramData>,
+
     system_program: Program<'info, System>,
     token_program: Program<'info, Token>,
     // remaining accounts: 1 to Multisig::MAX_SIGNERS admin signers (read-only, unsigned)
@@ -51,13 +61,18 @@ pub struct Init<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct InitParams {
     pub min_signatures: u8,
+    pub allow_swap: bool,
+    pub allow_add_liquidity: bool,
+    pub allow_remove_liquidity: bool,
+    pub allow_open_position: bool,
+    pub allow_close_position: bool,
+    pub allow_pnl_withdrawal: bool,
+    pub allow_collateral_withdrawal: bool,
+    pub allow_size_change: bool,
+    pub protocol_fee_share_bps: u64,
 }
 
 pub fn init(ctx: Context<Init>, params: &InitParams) -> Result<()> {
-    if !cfg!(feature = "test") {
-        return err!(PerpetualsError::InvalidEnvironment);
-    }
-
     // initialize multisig, this will fail if account is already initialized
     let mut multisig = ctx.accounts.multisig.load_init()?;
 
@@ -71,6 +86,15 @@ pub fn init(ctx: Context<Init>, params: &InitParams) -> Result<()> {
 
     // record perpetuals
     let perpetuals = ctx.accounts.perpetuals.as_mut();
+    perpetuals.permissions.allow_swap = params.allow_swap;
+    perpetuals.permissions.allow_add_liquidity = params.allow_add_liquidity;
+    perpetuals.permissions.allow_remove_liquidity = params.allow_remove_liquidity;
+    perpetuals.permissions.allow_open_position = params.allow_open_position;
+    perpetuals.permissions.allow_close_position = params.allow_close_position;
+    perpetuals.permissions.allow_pnl_withdrawal = params.allow_pnl_withdrawal;
+    perpetuals.permissions.allow_collateral_withdrawal = params.allow_collateral_withdrawal;
+    perpetuals.permissions.allow_size_change = params.allow_size_change;
+    perpetuals.protocol_fee_share_bps = params.protocol_fee_share_bps;
     perpetuals.transfer_authority_bump = *ctx
         .bumps
         .get("transfer_authority")
@@ -79,11 +103,7 @@ pub fn init(ctx: Context<Init>, params: &InitParams) -> Result<()> {
         .bumps
         .get("perpetuals")
         .ok_or(ProgramError::InvalidSeeds)?;
-    perpetuals.inception_time = if cfg!(feature = "test") {
-        0
-    } else {
-        perpetuals.get_time()?
-    };
+    perpetuals.inception_time = perpetuals.get_time()?;
 
     if !perpetuals.validate() {
         return err!(PerpetualsError::InvalidPerpetualsConfig);

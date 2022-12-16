@@ -2,13 +2,13 @@
 
 use {
     crate::{
-        error::PerpetualsError,
         math,
         state::{
             self,
             custody::Custody,
             multisig::{AdminInstruction, Multisig},
             perpetuals::Perpetuals,
+            pool::Pool,
         },
     },
     anchor_lang::prelude::*,
@@ -36,7 +36,6 @@ pub struct WithdrawFees<'info> {
     pub transfer_authority: AccountInfo<'info>,
 
     #[account(
-        mut,
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
     )]
@@ -44,7 +43,16 @@ pub struct WithdrawFees<'info> {
 
     #[account(
         mut,
+        seeds = [b"pool",
+                 pool.name.as_bytes()],
+        bump = pool.bump
+    )]
+    pub pool: Box<Account<'info, Pool>>,
+
+    #[account(
+        mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.key().as_ref()],
         bump = custody.bump
     )]
@@ -52,7 +60,10 @@ pub struct WithdrawFees<'info> {
 
     #[account(
         mut,
-        constraint = custody_token_account.key() == custody.token_account.key()
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 custody.mint.as_ref()],
+        bump = custody.token_account_bump
     )]
     pub custody_token_account: Box<Account<'info, TokenAccount>>,
 
@@ -83,10 +94,9 @@ pub fn withdraw_fees<'info>(
     params: &WithdrawFeesParams,
 ) -> Result<u8> {
     // validate inputs
-    //require!(
-    //params.token_amount > 0 || params.sol_amount > 0,
-    //PerpetualsError::InvalidTokenAmount
-    //);
+    if params.token_amount == 0 && params.sol_amount == 0 {
+        return Err(ProgramError::InvalidArgument.into());
+    }
 
     // validate signatures
     let mut multisig = ctx.accounts.multisig.load_mut()?;
@@ -110,12 +120,12 @@ pub fn withdraw_fees<'info>(
         msg!(
             "Withdraw token fees: {} / {}",
             params.token_amount,
-            custody.collected_fees
+            custody.assets.fees
         );
-        if custody.collected_fees < params.token_amount {
+        if custody.assets.fees < params.token_amount {
             return Err(ProgramError::InsufficientFunds.into());
         }
-        custody.collected_fees = math::checked_sub(custody.collected_fees, params.token_amount)?;
+        custody.assets.fees = math::checked_sub(custody.assets.fees, params.token_amount)?;
 
         ctx.accounts.perpetuals.transfer_tokens(
             ctx.accounts.custody_token_account.to_account_info(),

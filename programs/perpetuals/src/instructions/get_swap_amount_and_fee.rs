@@ -14,7 +14,7 @@ use {
 #[derive(Accounts)]
 pub struct GetSwapAmountAndFee<'info> {
     #[account()]
-    pub owner: Signer<'info>,
+    pub signer: Signer<'info>,
 
     #[account(
         seeds = [b"perpetuals"],
@@ -31,6 +31,7 @@ pub struct GetSwapAmountAndFee<'info> {
 
     #[account(
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  receiving_custody.mint.as_ref()],
         bump = receiving_custody.bump
     )]
@@ -38,12 +39,13 @@ pub struct GetSwapAmountAndFee<'info> {
 
     /// CHECK: oracle account for the received token
     #[account(
-        constraint = receiving_custody_oracle_account.key() == receiving_custody.oracle_account
+        constraint = receiving_custody_oracle_account.key() == receiving_custody.oracle.oracle_account
     )]
     pub receiving_custody_oracle_account: AccountInfo<'info>,
 
     #[account(
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  dispensing_custody.mint.as_ref()],
         bump = dispensing_custody.bump
     )]
@@ -51,7 +53,7 @@ pub struct GetSwapAmountAndFee<'info> {
 
     /// CHECK: oracle account for the returned token
     #[account(
-        constraint = dispensing_custody_oracle_account.key() == dispensing_custody.oracle_account
+        constraint = dispensing_custody_oracle_account.key() == dispensing_custody.oracle.oracle_account
     )]
     pub dispensing_custody_oracle_account: AccountInfo<'info>,
 }
@@ -83,17 +85,17 @@ pub fn get_swap_amount_and_fee(
     let receiving_custody = ctx.accounts.receiving_custody.as_mut();
     let dispensing_custody = ctx.accounts.dispensing_custody.as_mut();
     let received_token_price = OraclePrice::new_from_oracle(
-        receiving_custody.oracle_type,
-        &ctx.accounts.receiving_custody.to_account_info(),
-        receiving_custody.max_oracle_price_error,
-        receiving_custody.max_oracle_price_age_sec,
+        receiving_custody.oracle.oracle_type,
+        &receiving_custody.to_account_info(),
+        receiving_custody.oracle.max_price_error,
+        receiving_custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let dispensed_token_price = OraclePrice::new_from_oracle(
-        dispensing_custody.oracle_type,
-        &ctx.accounts.dispensing_custody.to_account_info(),
-        dispensing_custody.max_oracle_price_error,
-        dispensing_custody.max_oracle_price_age_sec,
+        dispensing_custody.oracle.oracle_type,
+        &dispensing_custody.to_account_info(),
+        dispensing_custody.oracle.max_price_error,
+        dispensing_custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let amount_out = pool.get_swap_amount(

@@ -7,11 +7,7 @@ pub mod perpetuals;
 pub mod pool;
 pub mod position;
 
-use {
-    crate::{error::PerpetualsError, math},
-    anchor_lang::{prelude::*, Discriminator},
-    anchor_spl::token::{Mint, TokenAccount},
-};
+use {crate::math, anchor_lang::prelude::*, anchor_spl::token::TokenAccount};
 
 pub fn is_empty_account(account_info: &AccountInfo) -> Result<bool> {
     Ok(account_info.try_data_is_empty()? || account_info.try_lamports()? == 0)

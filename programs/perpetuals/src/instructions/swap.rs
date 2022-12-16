@@ -39,7 +39,6 @@ pub struct Swap<'info> {
     pub transfer_authority: AccountInfo<'info>,
 
     #[account(
-        mut,
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
     )]
@@ -54,7 +53,9 @@ pub struct Swap<'info> {
     pub pool: Box<Account<'info, Pool>>,
 
     #[account(
+        mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  receiving_custody.mint.as_ref()],
         bump = receiving_custody.bump
     )]
@@ -62,18 +63,23 @@ pub struct Swap<'info> {
 
     /// CHECK: oracle account for the received token
     #[account(
-        constraint = receiving_custody_oracle_account.key() == receiving_custody.oracle_account
+        constraint = receiving_custody_oracle_account.key() == receiving_custody.oracle.oracle_account
     )]
     pub receiving_custody_oracle_account: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = receiving_custody_token_account.key() == receiving_custody.token_account.key()
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 receiving_custody.mint.as_ref()],
+        bump = receiving_custody.token_account_bump
     )]
     pub receiving_custody_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
+        mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  dispensing_custody.mint.as_ref()],
         bump = dispensing_custody.bump
     )]
@@ -81,13 +87,16 @@ pub struct Swap<'info> {
 
     /// CHECK: oracle account for the returned token
     #[account(
-        constraint = dispensing_custody_oracle_account.key() == dispensing_custody.oracle_account
+        constraint = dispensing_custody_oracle_account.key() == dispensing_custody.oracle.oracle_account
     )]
     pub dispensing_custody_oracle_account: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = dispensing_custody_token_account.key() == dispensing_custody.token_account.key()
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 dispensing_custody.mint.as_ref()],
+        bump = dispensing_custody.token_account_bump
     )]
     pub dispensing_custody_token_account: Box<Account<'info, TokenAccount>>,
 
@@ -104,8 +113,12 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
     // check permissions
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
+    let receiving_custody = ctx.accounts.receiving_custody.as_mut();
+    let dispensing_custody = ctx.accounts.dispensing_custody.as_mut();
     require!(
-        perpetuals.permissions.allow_swap,
+        perpetuals.permissions.allow_swap
+            && receiving_custody.permissions.allow_swap
+            && dispensing_custody.permissions.allow_swap,
         PerpetualsError::InstructionNotAllowed
     );
 
@@ -114,30 +127,25 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
     if params.amount_in == 0 {
         return Err(ProgramError::InvalidArgument.into());
     }
-    require_keys_neq!(
-        ctx.accounts.receiving_custody.key(),
-        ctx.accounts.dispensing_custody.key()
-    );
+    require_keys_neq!(receiving_custody.key(), dispensing_custody.key());
 
     // compute token amount returned to the user
     let pool = ctx.accounts.pool.as_mut();
     let curtime = perpetuals.get_time()?;
-    let token_id_in = pool.get_token_id(&ctx.accounts.receiving_custody.key())?;
-    let token_id_out = pool.get_token_id(&ctx.accounts.dispensing_custody.key())?;
-    let receiving_custody = ctx.accounts.receiving_custody.as_mut();
-    let dispensing_custody = ctx.accounts.dispensing_custody.as_mut();
+    let token_id_in = pool.get_token_id(&receiving_custody.key())?;
+    let token_id_out = pool.get_token_id(&dispensing_custody.key())?;
     let received_token_price = OraclePrice::new_from_oracle(
-        receiving_custody.oracle_type,
-        &ctx.accounts.receiving_custody.to_account_info(),
-        receiving_custody.max_oracle_price_error,
-        receiving_custody.max_oracle_price_age_sec,
+        receiving_custody.oracle.oracle_type,
+        &receiving_custody.to_account_info(),
+        receiving_custody.oracle.max_price_error,
+        receiving_custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let dispensed_token_price = OraclePrice::new_from_oracle(
-        dispensing_custody.oracle_type,
-        &ctx.accounts.dispensing_custody.to_account_info(),
-        dispensing_custody.max_oracle_price_error,
-        dispensing_custody.max_oracle_price_age_sec,
+        dispensing_custody.oracle.oracle_type,
+        &dispensing_custody.to_account_info(),
+        dispensing_custody.oracle.max_price_error,
+        dispensing_custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let mut amount_out = pool.get_swap_amount(
@@ -199,8 +207,8 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
         received_token_price.get_asset_amount_usd(params.amount_in, receiving_custody.decimals)?,
     )?;
 
-    receiving_custody.owned_amount =
-        math::checked_add(receiving_custody.owned_amount, params.amount_in)?;
+    receiving_custody.assets.owned =
+        math::checked_add(receiving_custody.assets.owned, params.amount_in)?;
 
     dispensing_custody.collected_fees.swap = math::checked_add(
         dispensing_custody.collected_fees.swap,
@@ -211,9 +219,9 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
         dispensed_token_price.get_asset_amount_usd(amount_out, dispensing_custody.decimals)?,
     )?;
 
-    dispensing_custody.fee_amount = math::checked_add(dispensing_custody.fee_amount, fee_amount)?;
-    dispensing_custody.owned_amount =
-        math::checked_sub(dispensing_custody.owned_amount, amount_out)?;
+    dispensing_custody.assets.fees = math::checked_add(dispensing_custody.assets.fees, fee_amount)?;
+    dispensing_custody.assets.owned =
+        math::checked_sub(dispensing_custody.assets.owned, amount_out)?;
 
     Ok(())
 }

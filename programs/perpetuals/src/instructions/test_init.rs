@@ -7,7 +7,7 @@ use {
     },
     anchor_lang::prelude::*,
     anchor_spl::token::Token,
-    solana_program::{program, program_error::ProgramError, sysvar},
+    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]
@@ -51,6 +51,15 @@ pub struct TestInit<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct TestInitParams {
     pub min_signatures: u8,
+    pub allow_swap: bool,
+    pub allow_add_liquidity: bool,
+    pub allow_remove_liquidity: bool,
+    pub allow_open_position: bool,
+    pub allow_close_position: bool,
+    pub allow_pnl_withdrawal: bool,
+    pub allow_collateral_withdrawal: bool,
+    pub allow_size_change: bool,
+    pub protocol_fee_share_bps: u64,
 }
 
 pub fn test_init(ctx: Context<TestInit>, params: &TestInitParams) -> Result<()> {
@@ -71,6 +80,15 @@ pub fn test_init(ctx: Context<TestInit>, params: &TestInitParams) -> Result<()> 
 
     // record perpetuals
     let perpetuals = ctx.accounts.perpetuals.as_mut();
+    perpetuals.permissions.allow_swap = params.allow_swap;
+    perpetuals.permissions.allow_add_liquidity = params.allow_add_liquidity;
+    perpetuals.permissions.allow_remove_liquidity = params.allow_remove_liquidity;
+    perpetuals.permissions.allow_open_position = params.allow_open_position;
+    perpetuals.permissions.allow_close_position = params.allow_close_position;
+    perpetuals.permissions.allow_pnl_withdrawal = params.allow_pnl_withdrawal;
+    perpetuals.permissions.allow_collateral_withdrawal = params.allow_collateral_withdrawal;
+    perpetuals.permissions.allow_size_change = params.allow_size_change;
+    perpetuals.protocol_fee_share_bps = params.protocol_fee_share_bps;
     perpetuals.transfer_authority_bump = *ctx
         .bumps
         .get("transfer_authority")

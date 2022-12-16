@@ -26,8 +26,14 @@ pub enum PerpetualsError {
     InvalidEnvironment,
     #[msg("Invalid pool state")]
     InvalidPoolState,
+    #[msg("Invalid custody state")]
+    InvalidCustodyState,
+    #[msg("Invalid position state")]
+    InvalidPositionState,
     #[msg("Invalid perpetuals config")]
     InvalidPerpetualsConfig,
+    #[msg("Invalid token config")]
+    InvalidTokenConfig,
     #[msg("Not enough tokens returned")]
     InsufficientAmountReturned,
     #[msg("Price slippage limit exceeded")]

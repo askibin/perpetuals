@@ -2,6 +2,7 @@ use {
     crate::{
         error::PerpetualsError,
         state::{
+            custody::Custody,
             math,
             oracle::OraclePrice,
             perpetuals::Fee,
@@ -12,19 +13,21 @@ use {
 };
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
-pub struct Token {
+pub struct PoolToken {
     pub custody: Pubkey,
-    pub ratio: u64,
+    pub target_ratio: u64,
+    pub min_ratio: u64,
+    pub max_ratio: u64,
 }
 
 #[account]
 #[derive(Default, Debug)]
 pub struct Pool {
     pub name: String,
-    pub tokens: Vec<Token>,
-    pub lp_token: Pubkey,
+    pub tokens: Vec<PoolToken>,
 
     pub bump: u8,
+    pub lp_token_bump: u8,
     pub inception_time: i64,
 }
 
@@ -89,13 +92,15 @@ impl Pool {
 
     pub fn check_amount_in(&self, token_id: usize, amount: u64) -> Result<bool> {
         let amount_limit = self.get_amount_limit(token_id)?;
-        let new_pool_amount = math::checked_add(self.tokens[token_id].total_amount, amount)?;
+        // TODO
+        let pool_amount = 0; //self.tokens[token_id].total_amount
+        let new_pool_amount = math::checked_add(pool_amount, amount)?;
         Ok(amount_limit >= new_pool_amount)
     }
 
     pub fn check_amount_out(&self, token_id: usize, amount: u64) -> Result<bool> {
         // TODO
-        let new_pool_amount = math::checked_sub(self.tokens[token_id].total_amount, amount)?;
+        //let new_pool_amount = math::checked_sub(self.tokens[token_id].total_amount, amount)?;
         Ok(true)
     }
 
@@ -111,7 +116,11 @@ impl Pool {
         Ok(true)
     }
 
-    pub fn get_liquidation_price(&self, position: &Position) -> Result<u64> {
+    pub fn get_liquidation_price(
+        &self,
+        position: &Position,
+        token_price: &OraclePrice,
+    ) -> Result<u64> {
         Ok(0)
     }
 
@@ -136,24 +145,24 @@ impl Pool {
         if self.tokens.len() > 1 && accounts.len() < (self.tokens.len() - 1) * 2 {
             return Err(ProgramError::NotEnoughAccountKeys.into());
         }
-        let pool_amount_usd: u128 = 0;
+        let mut pool_amount_usd: u128 = 0;
         for (idx, &token) in self.tokens.iter().enumerate() {
             if idx != skip_token_id {
                 require_keys_eq!(accounts[idx].key(), token.custody);
                 let custody = Account::<Custody>::try_from(&accounts[idx])?;
                 require_keys_eq!(
                     accounts[idx + self.tokens.len() - 1].key(),
-                    custody.oracle_account
+                    custody.oracle.oracle_account
                 );
                 let token_price = OraclePrice::new_from_oracle(
-                    custody.oracle_type,
+                    custody.oracle.oracle_type,
                     &accounts[idx + self.tokens.len() - 1],
-                    custody.max_oracle_price_error,
-                    custody.max_oracle_price_age_sec,
+                    custody.oracle.max_price_error,
+                    custody.oracle.max_price_age_sec,
                     curtime,
                 )?;
                 let token_amount_usd =
-                    token_price.get_asset_amount_usd(custody.owned_amount, custody.decimals)?;
+                    token_price.get_asset_amount_usd(custody.assets.owned, custody.decimals)?;
 
                 pool_amount_usd = math::checked_add(pool_amount_usd, token_amount_usd as u128)?;
             }

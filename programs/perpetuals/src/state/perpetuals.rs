@@ -39,6 +39,7 @@ pub struct Permissions {
 pub struct Perpetuals {
     pub permissions: Permissions,
     pub pools: Vec<Pubkey>,
+    pub protocol_fee_share_bps: u64,
 
     pub transfer_authority_bump: u8,
     pub perpetuals_bump: u8,

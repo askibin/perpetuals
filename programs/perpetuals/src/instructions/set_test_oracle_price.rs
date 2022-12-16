@@ -6,6 +6,7 @@ use {
         multisig::{AdminInstruction, Multisig},
         oracle::TestOracle,
         perpetuals::Perpetuals,
+        pool::Pool,
     },
     anchor_lang::prelude::*,
 };
@@ -29,7 +30,15 @@ pub struct SetTestOraclePrice<'info> {
     pub perpetuals: Box<Account<'info, Perpetuals>>,
 
     #[account(
+        seeds = [b"pool",
+                 pool.name.as_bytes()],
+        bump = pool.bump
+    )]
+    pub pool: Box<Account<'info, Pool>>,
+
+    #[account(
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
         bump = custody.bump
     )]
@@ -39,10 +48,10 @@ pub struct SetTestOraclePrice<'info> {
         init_if_needed,
         payer = admin,
         space = TestOracle::LEN,
-        constraint = oracle_account.key() == custody.oracle_account,
+        //constraint = oracle_account.key() == custody.oracle.oracle_account,
         seeds = [b"oracle_account",
-                 custody.mint.as_ref(),
-                 perpetuals.key().as_ref()],
+                 pool.key().as_ref(),
+                 custody.mint.as_ref()],
         bump
     )]
     pub oracle_account: Box<Account<'info, TestOracle>>,

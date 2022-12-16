@@ -2,14 +2,13 @@
 
 use {
     crate::{
-        error::PerpetualsError,
         math,
         state::{
             custody::Custody,
             oracle::OraclePrice,
             perpetuals::{Perpetuals, PriceAndFee},
             pool::Pool,
-            position::{Position, Side},
+            position::Position,
         },
     },
     anchor_lang::prelude::*,
@@ -19,7 +18,7 @@ use {
 #[derive(Accounts)]
 pub struct GetExitPriceAndFee<'info> {
     #[account()]
-    pub owner: Signer<'info>,
+    pub signer: Signer<'info>,
 
     #[account(
         seeds = [b"perpetuals"],
@@ -36,9 +35,9 @@ pub struct GetExitPriceAndFee<'info> {
 
     #[account(
         seeds = [b"position",
-                 owner.key().as_ref(),
+                 position.owner.as_ref(),
                  pool.key().as_ref(),
-                 collateral_custody.key().as_ref(),
+                 custody.key().as_ref(),
                  &[position.side as u8]],
         bump
     )]
@@ -46,6 +45,7 @@ pub struct GetExitPriceAndFee<'info> {
 
     #[account(
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
         bump = custody.bump
     )]
@@ -53,7 +53,7 @@ pub struct GetExitPriceAndFee<'info> {
 
     /// CHECK: oracle account for the collateral token
     #[account(
-        constraint = custody_oracle_account.key() == custody.oracle_account
+        constraint = custody_oracle_account.key() == custody.oracle.oracle_account
     )]
     pub custody_oracle_account: AccountInfo<'info>,
 }
@@ -79,16 +79,16 @@ pub fn get_exit_price_and_fee(
     let curtime = ctx.accounts.perpetuals.get_time()?;
     let custody = ctx.accounts.custody.as_mut();
     let token_price = OraclePrice::new_from_oracle(
-        custody.oracle_type,
-        &ctx.accounts.custody.to_account_info(),
-        custody.max_oracle_price_error,
-        custody.max_oracle_price_age_sec,
+        custody.oracle.oracle_type,
+        &custody.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let exit_price = pool.get_exit_price(position, &token_price)?;
 
     // compute amount to close
-    let unrealized_pnl = math::checked_add(position.unrealized_pnl, position.get_pnl()?)?;
+    let unrealized_pnl = math::checked_add(position.unrealized_pnl, pool.get_pnl(&position)?)?;
     let available_amount = math::checked_add(position.collateral, unrealized_pnl)?;
     let close_amount = math::checked_as_u64(math::checked_div(
         math::checked_mul(available_amount as u128, params.size as u128)?,

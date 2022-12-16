@@ -10,13 +10,14 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "perpetuals"
+name = "solana_perpetuals"
 
 [features]
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
+test = []
 default = []
 
 [profile.release]

@@ -1,4 +1,4 @@
-//! DeletePool instruction handler
+//! RemovePool instruction handler
 
 use {
     crate::{
@@ -13,8 +13,8 @@ use {
 };
 
 #[derive(Accounts)]
-pub struct DeletePool<'info> {
-    #[account()]
+pub struct RemovePool<'info> {
+    #[account(mut)]
     pub admin: Signer<'info>,
 
     #[account(
@@ -26,6 +26,7 @@ pub struct DeletePool<'info> {
 
     /// CHECK: empty PDA, authority for token accounts
     #[account(
+        mut,
         seeds = [b"transfer_authority"],
         bump = perpetuals.transfer_authority_bump
     )]
@@ -33,6 +34,9 @@ pub struct DeletePool<'info> {
 
     #[account(
         mut,
+        realloc = Perpetuals::LEN + (perpetuals.pools.len() - 1) * 32,
+        realloc::payer = admin,
+        realloc::zero = false,
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
     )]
@@ -46,14 +50,16 @@ pub struct DeletePool<'info> {
         close = transfer_authority
     )]
     pub pool: Box<Account<'info, Pool>>,
+
+    system_program: Program<'info, System>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct DeletePoolParams {}
+pub struct RemovePoolParams {}
 
-pub fn delete_pool<'info>(
-    ctx: Context<'_, '_, '_, 'info, DeletePool<'info>>,
-    params: &DeletePoolParams,
+pub fn remove_pool<'info>(
+    ctx: Context<'_, '_, '_, 'info, RemovePool<'info>>,
+    params: &RemovePoolParams,
 ) -> Result<u8> {
     // validate signatures
     let mut multisig = ctx.accounts.multisig.load_mut()?;
@@ -61,7 +67,7 @@ pub fn delete_pool<'info>(
     let signatures_left = multisig.sign_multisig(
         &ctx.accounts.admin,
         &Multisig::get_account_infos(&ctx)[1..],
-        &Multisig::get_instruction_data(AdminInstruction::DeletePool, params)?,
+        &Multisig::get_instruction_data(AdminInstruction::RemovePool, params)?,
     )?;
     if signatures_left > 0 {
         msg!(
@@ -75,6 +81,15 @@ pub fn delete_pool<'info>(
         ctx.accounts.pool.tokens.is_empty(),
         PerpetualsError::InvalidPoolState
     );
+
+    // remove pool from the list
+    let perpetuals = ctx.accounts.perpetuals.as_mut();
+    let pool_idx = perpetuals
+        .pools
+        .iter()
+        .position(|x| *x == ctx.accounts.pool.key())
+        .ok_or::<Error>(PerpetualsError::InvalidPoolState.into())?;
+    perpetuals.pools.remove(pool_idx);
 
     Ok(0)
 }

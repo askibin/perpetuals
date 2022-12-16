@@ -1,13 +1,11 @@
 //! SetTokenConfig instruction handler
 
 use {
-    crate::{
-        error::PerpetualsError,
-        state::{
-            custody::Custody,
-            multisig::{AdminInstruction, Multisig},
-            oracle::OracleType,
-        },
+    crate::state::{
+        custody::{Custody, Fees, OracleParams},
+        multisig::{AdminInstruction, Multisig},
+        perpetuals::Permissions,
+        pool::Pool,
     },
     anchor_lang::prelude::*,
 };
@@ -26,25 +24,41 @@ pub struct SetTokenConfig<'info> {
 
     #[account(
         mut,
+        seeds = [b"pool",
+                 pool.name.as_bytes()],
+        bump = pool.bump
+    )]
+    pub pool: Box<Account<'info, Pool>>,
+
+    #[account(
+        mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
-        bump = custody.bump
+        bump
     )]
     pub custody: Box<Account<'info, Custody>>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct SetTokenConfigParams {
-    pub max_oracle_price_error: f64,
-    pub max_oracle_price_age_sec: u32,
-    pub oracle_type: OracleType,
-    pub oracle_account: Pubkey,
+    pub oracle: OracleParams,
+    pub permissions: Permissions,
+    pub fees: Fees,
+    pub target_ratio: u64,
+    pub min_ratio: u64,
+    pub max_ratio: u64,
 }
 
 pub fn set_token_config<'info>(
     ctx: Context<'_, '_, '_, 'info, SetTokenConfig<'info>>,
     params: &SetTokenConfigParams,
 ) -> Result<u8> {
+    // validate inputs
+    if params.min_ratio > params.target_ratio || params.target_ratio > params.max_ratio {
+        return Err(ProgramError::InvalidArgument.into());
+    }
+
     // validate signatures
     let mut multisig = ctx.accounts.multisig.load_mut()?;
 
@@ -61,16 +75,18 @@ pub fn set_token_config<'info>(
         return Ok(signatures_left);
     }
 
+    // update pool data
+    let pool = ctx.accounts.pool.as_mut();
+    let idx = pool.get_token_id(&ctx.accounts.custody.key())?;
+    pool.tokens[idx].target_ratio = params.target_ratio;
+    pool.tokens[idx].min_ratio = params.min_ratio;
+    pool.tokens[idx].max_ratio = params.max_ratio;
+
     // update custody data
     let custody = ctx.accounts.custody.as_mut();
-    custody.max_oracle_price_error = params.max_oracle_price_error;
-    custody.max_oracle_price_age_sec = params.max_oracle_price_age_sec;
-    custody.oracle_type = params.oracle_type;
-    custody.oracle_account = params.oracle_account;
+    custody.oracle = params.oracle;
+    custody.permissions = params.permissions;
+    custody.fees = params.fees;
 
-    //if !custody.validate() {
-    //err!(PerpetualsError::InvalidCustodyConfig)
-    //} else {
     Ok(0)
-    //}
 }

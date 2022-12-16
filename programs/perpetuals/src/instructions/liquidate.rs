@@ -1,4 +1,4 @@
-//! ClosePosition instruction handler
+//! Liquidate instruction handler
 
 use {
     crate::{
@@ -14,20 +14,26 @@ use {
     },
     anchor_lang::prelude::*,
     anchor_spl::token::{Token, TokenAccount},
-    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]
-pub struct ClosePosition<'info> {
+pub struct Liquidate<'info> {
     #[account(mut)]
-    pub owner: Signer<'info>,
+    pub signer: Signer<'info>,
 
     #[account(
         mut,
         constraint = receiving_account.mint == custody.mint,
-        has_one = owner
+        constraint = receiving_account.owner == position.owner
     )]
     pub receiving_account: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        constraint = receiving_account.mint == custody.mint,
+        constraint = receiving_account.owner == *signer.owner
+    )]
+    pub rewards_receiving_account: Box<Account<'info, TokenAccount>>,
 
     /// CHECK: empty PDA, authority for token accounts
     #[account(
@@ -52,9 +58,8 @@ pub struct ClosePosition<'info> {
 
     #[account(
         mut,
-        has_one = owner,
         seeds = [b"position",
-                 owner.key().as_ref(),
+                 position.owner.as_ref(),
                  pool.key().as_ref(),
                  custody.key().as_ref(),
                  &[position.side as u8]],
@@ -90,15 +95,9 @@ pub struct ClosePosition<'info> {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct ClosePositionParams {
-    price: u64,
-    size: u64,
-    collateral_only: u64,
-    size_only: u64,
-    profit_only: u64,
-}
+pub struct LiquidateParams {}
 
-pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams) -> Result<()> {
+pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<()> {
     // check permissions
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
@@ -108,14 +107,15 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
         PerpetualsError::InstructionNotAllowed
     );
 
-    // validate inputs
-    msg!("Validate inputs");
-    if params.price == 0 || params.size == 0 {
-        return Err(ProgramError::InvalidArgument.into());
-    }
     let position = ctx.accounts.position.as_mut();
     let pool = ctx.accounts.pool.as_mut();
     let token_id = pool.get_token_id(&custody.key())?;
+
+    // check if position can be liquidated
+    require!(
+        !pool.check_leverage(position)?,
+        PerpetualsError::InvalidPositionState
+    );
 
     // compute exit price
     let curtime = perpetuals.get_time()?;
@@ -128,19 +128,11 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
     )?;
     let exit_price = pool.get_exit_price(position, &token_price)?;
     msg!("Exit price: {}", exit_price);
-    if position.side == Side::Long {
-        require_gte!(exit_price, params.price, PerpetualsError::MaxPriceSlippage);
-    } else {
-        require_gte!(params.price, exit_price, PerpetualsError::MaxPriceSlippage);
-    }
 
     // compute amount to close
     let unrealized_pnl = math::checked_add(position.unrealized_pnl, pool.get_pnl(position)?)?;
     let available_amount = math::checked_add(position.collateral, unrealized_pnl)?;
-    let close_amount = math::checked_as_u64(math::checked_div(
-        math::checked_mul(available_amount as u128, params.size as u128)?,
-        1000000u128,
-    )?)?;
+    let close_amount = available_amount;
 
     // compute fee
     let fee = pool.get_exit_fee(position)?;
@@ -168,10 +160,6 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
     //position.size = math::checked_sub(position.size, params.size)?;
     //position.collateral = math::checked_sub(position.collateral, params.collateral)?;
 
-    // check position risk
-    msg!("Check position risks");
-    require!(pool.check_leverage(position)?, PerpetualsError::MaxLeverage);
-
     // unlock pool funds
     pool.unlock_funds(transfer_amount)?;
 
@@ -193,16 +181,16 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
     )?;
     custody.volume_stats.close_position = math::checked_add(
         custody.volume_stats.close_position,
-        token_price.get_asset_amount_usd(params.size, custody.decimals)?,
+        token_price.get_asset_amount_usd(close_amount, custody.decimals)?,
     )?;
 
     custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
 
     if position.side == Side::Long {
-        custody.trade_stats.oi_long = math::checked_sub(custody.trade_stats.oi_long, params.size)?;
+        custody.trade_stats.oi_long = math::checked_sub(custody.trade_stats.oi_long, close_amount)?;
     } else {
         custody.trade_stats.oi_short =
-            math::checked_sub(custody.trade_stats.oi_short, params.size)?;
+            math::checked_sub(custody.trade_stats.oi_short, close_amount)?;
     }
     let pnl = 0;
     if pnl > 0 {

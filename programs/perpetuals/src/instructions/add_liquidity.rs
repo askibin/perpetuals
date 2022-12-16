@@ -4,18 +4,11 @@ use {
     crate::{
         error::PerpetualsError,
         math,
-        state::{
-            custody::Custody,
-            multisig::Multisig,
-            oracle::OraclePrice,
-            perpetuals::Perpetuals,
-            pool::Pool,
-            position::{Position, Side},
-        },
+        state::{custody::Custody, oracle::OraclePrice, perpetuals::Perpetuals, pool::Pool},
     },
     anchor_lang::prelude::*,
     anchor_spl::token::{Mint, Token, TokenAccount},
-    solana_program::{program, program_error::ProgramError},
+    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]
@@ -46,7 +39,6 @@ pub struct AddLiquidity<'info> {
     pub transfer_authority: AccountInfo<'info>,
 
     #[account(
-        mut,
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
     )]
@@ -61,7 +53,9 @@ pub struct AddLiquidity<'info> {
     pub pool: Box<Account<'info, Pool>>,
 
     #[account(
+        mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
         bump = custody.bump
     )]
@@ -69,19 +63,24 @@ pub struct AddLiquidity<'info> {
 
     /// CHECK: oracle account for the receiving token
     #[account(
-        constraint = custody_oracle_account.key() == custody.oracle_account
+        constraint = custody_oracle_account.key() == custody.oracle.oracle_account
     )]
     pub custody_oracle_account: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = custody_token_account.key() == custody.token_account.key()
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 custody.mint.as_ref()],
+        bump = custody.token_account_bump
     )]
     pub custody_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
-        constraint = lp_token_mint.key() == pool.lp_token
+        seeds = [b"lp_token_mint",
+                 pool.key().as_ref()],
+        bump = pool.lp_token_bump
     )]
     pub lp_token_mint: Box<Account<'info, Mint>>,
 
@@ -100,8 +99,9 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     // check permissions
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
+    let custody = ctx.accounts.custody.as_mut();
     require!(
-        perpetuals.permissions.allow_add_liquidity,
+        perpetuals.permissions.allow_add_liquidity && custody.permissions.allow_add_liquidity,
         PerpetualsError::InstructionNotAllowed
     );
 
@@ -111,7 +111,7 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
         return Err(ProgramError::InvalidArgument.into());
     }
     let pool = ctx.accounts.pool.as_mut();
-    let token_id = pool.get_token_id(&ctx.accounts.custody.key())?;
+    let token_id = pool.get_token_id(&custody.key())?;
 
     // calculate fee
     let fee = pool.get_add_liquidity_fee(token_id)?;
@@ -138,16 +138,15 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     // compute assets under management
     msg!("Compute assets under management");
     let curtime = perpetuals.get_time()?;
-    let custody = ctx.accounts.custody.as_mut();
     let token_price = OraclePrice::new_from_oracle(
-        custody.oracle_type,
-        &ctx.accounts.custody.to_account_info(),
-        custody.max_oracle_price_error,
-        custody.max_oracle_price_age_sec,
+        custody.oracle.oracle_type,
+        &custody.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let mut pool_amount_usd: u128 =
-        token_price.get_asset_amount_usd(custody.owned_amount, custody.decimals)? as u128;
+        token_price.get_asset_amount_usd(custody.assets.owned, custody.decimals)? as u128;
     pool_amount_usd = math::checked_add(
         pool_amount_usd,
         pool.get_assets_under_management(&ctx.remaining_accounts, token_id, curtime)?,
@@ -194,8 +193,8 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
         token_price.get_asset_amount_usd(params.amount, custody.decimals)?,
     )?;
 
-    custody.fee_amount = math::checked_add(custody.fee_amount, fee_amount)?;
-    custody.owned_amount = math::checked_add(custody.owned_amount, params.amount)?;
+    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
+    custody.assets.owned = math::checked_add(custody.assets.owned, params.amount)?;
 
     Ok(())
 }

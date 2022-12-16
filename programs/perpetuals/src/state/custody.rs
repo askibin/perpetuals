@@ -1,7 +1,23 @@
-use {crate::state::oracle::OracleType, anchor_lang::prelude::*};
+use {
+    crate::state::{
+        oracle::OracleType,
+        perpetuals::{Fee, Permissions},
+    },
+    anchor_lang::prelude::*,
+};
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
-pub struct CollectedFees {
+pub struct Fees {
+    pub swap: Fee,
+    pub add_liquidity: Fee,
+    pub remove_liquidity: Fee,
+    pub open_position: Fee,
+    pub close_position: Fee,
+    pub liquidation: Fee,
+}
+
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
+pub struct FeesStats {
     pub swap: u64,
     pub add_liquidity: u64,
     pub remove_liquidity: u64,
@@ -28,34 +44,47 @@ pub struct TradeStats {
     pub oi_short: u64,
 }
 
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
+pub struct Assets {
+    pub collateral: u64,
+    pub fees: u64,
+    pub owned: u64,
+    pub locked: u64,
+}
+
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
+pub struct OracleParams {
+    pub oracle_account: Pubkey,
+    pub oracle_type: OracleType,
+    pub max_price_error: f64,
+    pub max_price_age_sec: u32,
+}
+
 #[account]
 #[derive(Default, Debug)]
 pub struct Custody {
     pub token_account: Pubkey,
     pub mint: Pubkey,
     pub decimals: u8,
-    pub max_oracle_price_error: f64,
-    pub max_oracle_price_age_sec: u32,
-    pub oracle_type: OracleType,
-    pub oracle_account: Pubkey,
+    pub oracle: OracleParams,
+    pub permissions: Permissions,
+    pub fees: Fees,
 
-    pub collateral_amount: u64,
-    pub fee_amount: u64,
-    pub owned_amount: u64,
-    pub locked_amount: u64,
-
-    pub collected_fees: CollectedFees,
+    pub assets: Assets,
+    pub collected_fees: FeesStats,
     pub volume_stats: VolumeStats,
     pub trade_stats: TradeStats,
 
     pub bump: u8,
+    pub token_account_bump: u8,
 }
 
 impl Custody {
     pub const LEN: usize = 8 + std::mem::size_of::<Custody>();
 
     pub fn validate(&self) -> bool {
-        matches!(self.oracle_type, OracleType::None)
-            || (self.oracle_account != Pubkey::default() && self.max_oracle_price_error >= 0.0)
+        matches!(self.oracle.oracle_type, OracleType::None)
+            || (self.oracle.oracle_account != Pubkey::default()
+                && self.oracle.max_price_error >= 0.0)
     }
 }

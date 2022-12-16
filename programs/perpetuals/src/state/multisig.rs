@@ -23,12 +23,11 @@ pub struct Multisig {
 }
 
 pub enum AdminInstruction {
-    InitPool,
-    DeletePool,
+    AddPool,
+    RemovePool,
     AddToken,
     RemoveToken,
     SetAdminSigners,
-    SetPoolConfig,
     SetTokenConfig,
     SetPermissions,
     WithdrawFees,

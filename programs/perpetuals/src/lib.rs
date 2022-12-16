@@ -7,7 +7,11 @@ mod instructions;
 mod math;
 mod state;
 
-use {anchor_lang::prelude::*, instructions::*, state::perpetuals::PriceAndFee};
+use {
+    anchor_lang::prelude::*,
+    instructions::*,
+    state::perpetuals::{AmountAndFee, PriceAndFee},
+};
 
 solana_security_txt::security_txt! {
     name: "Perpetuals",
@@ -29,18 +33,18 @@ pub mod perpetuals {
         instructions::init(ctx, &params)
     }
 
-    pub fn init_pool<'info>(
-        ctx: Context<'_, '_, '_, 'info, InitPool<'info>>,
-        params: InitPoolParams,
+    pub fn add_pool<'info>(
+        ctx: Context<'_, '_, '_, 'info, AddPool<'info>>,
+        params: AddPoolParams,
     ) -> Result<u8> {
-        instructions::init_pool(ctx, &params)
+        instructions::add_pool(ctx, &params)
     }
 
-    pub fn delete_pool<'info>(
-        ctx: Context<'_, '_, '_, 'info, DeletePool<'info>>,
-        params: DeletePoolParams,
+    pub fn remove_pool<'info>(
+        ctx: Context<'_, '_, '_, 'info, RemovePool<'info>>,
+        params: RemovePoolParams,
     ) -> Result<u8> {
-        instructions::delete_pool(ctx, &params)
+        instructions::remove_pool(ctx, &params)
     }
 
     pub fn add_token<'info>(
@@ -62,13 +66,6 @@ pub mod perpetuals {
         params: SetAdminSignersParams,
     ) -> Result<u8> {
         instructions::set_admin_signers(ctx, &params)
-    }
-
-    pub fn set_pool_config<'info>(
-        ctx: Context<'_, '_, '_, 'info, SetPoolConfig<'info>>,
-        params: SetPoolConfigParams,
-    ) -> Result<u8> {
-        instructions::set_pool_config(ctx, &params)
     }
 
     pub fn set_token_config<'info>(
@@ -137,6 +134,10 @@ pub mod perpetuals {
         instructions::close_position(ctx, &params)
     }
 
+    pub fn liquidate(ctx: Context<Liquidate>, params: LiquidateParams) -> Result<()> {
+        instructions::liquidate(ctx, &params)
+    }
+
     pub fn get_entry_price_and_fee(
         ctx: Context<GetEntryPriceAndFee>,
         params: GetEntryPriceAndFeeParams,
@@ -158,7 +159,10 @@ pub mod perpetuals {
         instructions::get_liquidation_price(ctx, &params)
     }
 
-    pub fn get_swap_amount_and_fee(ctx: Context<Swap>, params: SwapParams) -> Result<AmountAndFee> {
+    pub fn get_swap_amount_and_fee(
+        ctx: Context<GetSwapAmountAndFee>,
+        params: GetSwapAmountAndFeeParams,
+    ) -> Result<AmountAndFee> {
         instructions::get_swap_amount_and_fee(ctx, &params)
     }
 }

@@ -4,17 +4,20 @@ use {
     crate::{
         error::PerpetualsError,
         state::{
+            self,
             custody::Custody,
             multisig::{AdminInstruction, Multisig},
-            oracle::OracleType,
+            perpetuals::Perpetuals,
+            pool::{Pool, PoolToken},
         },
     },
     anchor_lang::prelude::*,
+    anchor_spl::token::{Token, TokenAccount},
 };
 
 #[derive(Accounts)]
 pub struct RemoveToken<'info> {
-    #[account()]
+    #[account(mut)]
     pub admin: Signer<'info>,
 
     #[account(
@@ -24,22 +27,56 @@ pub struct RemoveToken<'info> {
     )]
     pub multisig: AccountLoader<'info, Multisig>,
 
+    /// CHECK: empty PDA, authority for token accounts
+    #[account(
+        mut,
+        seeds = [b"transfer_authority"],
+        bump = perpetuals.transfer_authority_bump
+    )]
+    pub transfer_authority: AccountInfo<'info>,
+
+    #[account(
+        seeds = [b"perpetuals"],
+        bump = perpetuals.perpetuals_bump
+    )]
+    pub perpetuals: Box<Account<'info, Perpetuals>>,
+
+    #[account(
+        mut,
+        realloc = Pool::LEN + (pool.tokens.len() - 1) * std::mem::size_of::<PoolToken>(),
+        realloc::payer = admin,
+        realloc::zero = false,
+        seeds = [b"pool",
+                 pool.name.as_bytes()],
+        bump = pool.bump
+    )]
+    pub pool: Box<Account<'info, Pool>>,
+
     #[account(
         mut,
         seeds = [b"custody",
+                 pool.key().as_ref(),
                  custody.mint.as_ref()],
-        bump = custody.bump
+        bump = custody.bump,
+        close = transfer_authority
     )]
     pub custody: Box<Account<'info, Custody>>,
+
+    #[account(
+        mut,
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 custody.mint.as_ref()],
+        bump = custody.token_account_bump,
+    )]
+    pub custody_token_account: Box<Account<'info, TokenAccount>>,
+
+    system_program: Program<'info, System>,
+    token_program: Program<'info, Token>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct RemoveTokenParams {
-    pub max_oracle_price_error: f64,
-    pub max_oracle_price_age_sec: u32,
-    pub oracle_type: OracleType,
-    pub oracle_account: Pubkey,
-}
+pub struct RemoveTokenParams {}
 
 pub fn remove_token<'info>(
     ctx: Context<'_, '_, '_, 'info, RemoveToken<'info>>,
@@ -61,16 +98,26 @@ pub fn remove_token<'info>(
         return Ok(signatures_left);
     }
 
-    // update custody data
-    let custody = ctx.accounts.custody.as_mut();
-    custody.max_oracle_price_error = params.max_oracle_price_error;
-    custody.max_oracle_price_age_sec = params.max_oracle_price_age_sec;
-    custody.oracle_type = params.oracle_type;
-    custody.oracle_account = params.oracle_account;
+    require!(
+        ctx.accounts.custody_token_account.amount == 0,
+        PerpetualsError::InvalidCustodyState
+    );
 
-    //if !custody.validate() {
-    //err!(PerpetualsError::InvalidCustodyConfig)
-    //} else {
+    // remove token from the list
+    let pool = ctx.accounts.pool.as_mut();
+    let token_id = pool.get_token_id(&ctx.accounts.custody.key())?;
+    pool.tokens.remove(token_id);
+
+    state::close_token_account(
+        ctx.accounts.transfer_authority.to_account_info(),
+        ctx.accounts.custody_token_account.to_account_info(),
+        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.transfer_authority.to_account_info(),
+        &[&[
+            b"transfer_authority",
+            &[ctx.accounts.perpetuals.transfer_authority_bump],
+        ]],
+    )?;
+
     Ok(0)
-    //}
 }
