@@ -110,9 +110,9 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
 
     // validate inputs
     msg!("Validate inputs");
-    if params.price == 0 || params.size == 0 {
-        return Err(ProgramError::InvalidArgument.into());
-    }
+    //if params.price == 0 || params.size == 0 || params.size > position.size {
+    //    return Err(ProgramError::InvalidArgument.into());
+    //}
     let position = ctx.accounts.position.as_mut();
     let pool = ctx.accounts.pool.as_mut();
     let token_id = pool.get_token_id(&custody.key())?;
@@ -121,7 +121,7 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
     let curtime = perpetuals.get_time()?;
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
-        &custody.to_account_info(),
+        &ctx.accounts.custody_oracle_account.to_account_info(),
         custody.oracle.max_price_error,
         custody.oracle.max_price_age_sec,
         curtime,
@@ -139,11 +139,13 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
     let available_amount = math::checked_add(position.collateral, unrealized_pnl)?;
     let close_amount = math::checked_as_u64(math::checked_div(
         math::checked_mul(available_amount as u128, params.size as u128)?,
-        1000000u128,
+        position.size as u128,
     )?)?;
 
+    // compute swap fee
+
     // compute fee
-    let fee = pool.get_exit_fee(position)?;
+    let fee = pool.get_exit_fee(position, &[&custody])?;
     let fee_amount = fee.get_fee_amount(close_amount)?;
     msg!("Collected fee: {}", fee_amount);
 
@@ -185,8 +187,8 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
         transfer_amount,
     )?;
 
-    // update pool stats
-    msg!("Update pool stats");
+    // update custody stats
+    msg!("Update custody stats");
     custody.collected_fees.close_position = math::checked_add(
         custody.collected_fees.close_position,
         token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
@@ -196,7 +198,7 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
         token_price.get_asset_amount_usd(params.size, custody.decimals)?,
     )?;
 
-    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
+    //custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
 
     if position.side == Side::Long {
         custody.trade_stats.oi_long = math::checked_sub(custody.trade_stats.oi_long, params.size)?;

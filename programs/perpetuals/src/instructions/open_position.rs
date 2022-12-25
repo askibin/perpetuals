@@ -117,7 +117,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     if params.price == 0
         || (params.collateral == 0 && position.time == 0)
         || params.size == 0
-        || params.collateral < params.size
+        /*|| params.collateral > params.size*/
         || params.side == Side::None
     {
         return Err(ProgramError::InvalidArgument.into());
@@ -128,7 +128,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     let curtime = perpetuals.get_time()?;
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
-        &custody.to_account_info(),
+        &ctx.accounts.custody_oracle_account.to_account_info(),
         custody.oracle.max_price_error,
         custody.oracle.max_price_age_sec,
         curtime,
@@ -149,8 +149,10 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         );
     }
 
+    // compute swap fee
+
     // compute fee
-    let fee = pool.get_entry_fee(token_id, params.side, params.size)?;
+    let fee = pool.get_entry_fee(0, params.side, params.size, &[&custody])?;
     let fee_amount = fee.get_fee_amount(params.size)?;
     msg!("Collected fee: {}", fee_amount);
 
@@ -219,8 +221,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         transfer_amount,
     )?;
 
-    // update pool stats
-    msg!("Update pool stats");
+    // update custody stats
+    msg!("Update custody stats");
     custody.collected_fees.open_position = math::checked_add(
         custody.collected_fees.open_position,
         token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
@@ -230,7 +232,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         token_price.get_asset_amount_usd(params.size, custody.decimals)?,
     )?;
 
-    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
+    //custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
 
     if params.side == Side::Long {
         custody.trade_stats.oi_long = math::checked_add(custody.trade_stats.oi_long, params.size)?;

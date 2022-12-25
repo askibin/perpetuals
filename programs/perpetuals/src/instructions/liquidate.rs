@@ -30,8 +30,8 @@ pub struct Liquidate<'info> {
 
     #[account(
         mut,
-        constraint = receiving_account.mint == custody.mint,
-        constraint = receiving_account.owner == *signer.owner
+        constraint = rewards_receiving_account.mint == custody.mint,
+        constraint = rewards_receiving_account.owner == signer.key()
     )]
     pub rewards_receiving_account: Box<Account<'info, TokenAccount>>,
 
@@ -121,7 +121,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
     let curtime = perpetuals.get_time()?;
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
-        &custody.to_account_info(),
+        &ctx.accounts.custody_oracle_account.to_account_info(),
         custody.oracle.max_price_error,
         custody.oracle.max_price_age_sec,
         curtime,
@@ -135,7 +135,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
     let close_amount = available_amount;
 
     // compute fee
-    let fee = pool.get_exit_fee(position)?;
+    let fee = pool.get_exit_fee(position, &[&custody])?;
     let fee_amount = fee.get_fee_amount(close_amount)?;
     msg!("Collected fee: {}", fee_amount);
 
@@ -173,8 +173,8 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         transfer_amount,
     )?;
 
-    // update pool stats
-    msg!("Update pool stats");
+    // update custody stats
+    msg!("Update custody stats");
     custody.collected_fees.close_position = math::checked_add(
         custody.collected_fees.close_position,
         token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
@@ -184,7 +184,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         token_price.get_asset_amount_usd(close_amount, custody.decimals)?,
     )?;
 
-    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
+    //custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
 
     if position.side == Side::Long {
         custody.trade_stats.oi_long = math::checked_sub(custody.trade_stats.oi_long, close_amount)?;

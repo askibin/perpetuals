@@ -1,8 +1,9 @@
 //! Oracle price service handling
 
 use {
-    crate::{error::PerpetualsError, math, state},
+    crate::{error::PerpetualsError, math, state, state::perpetuals::Perpetuals},
     anchor_lang::prelude::*,
+    core::cmp::Ordering,
 };
 
 const ORACLE_EXPONENT_SCALE: i32 = -9;
@@ -41,10 +42,29 @@ impl TestOracle {
     pub const LEN: usize = 8 + std::mem::size_of::<TestOracle>();
 }
 
+impl PartialOrd for OraclePrice {
+    fn partial_cmp(&self, other: &OraclePrice) -> Option<Ordering> {
+        let (lhs, rhs) = if self.exponent == other.exponent {
+            (self.price, other.price)
+        } else if self.exponent < other.exponent {
+            if let Ok(scaled_price) = other.scale_to_exponent(self.exponent) {
+                (self.price, scaled_price.price)
+            } else {
+                return None;
+            }
+        } else {
+            if let Ok(scaled_price) = self.scale_to_exponent(other.exponent) {
+                (scaled_price.price, other.price)
+            } else {
+                return None;
+            }
+        };
+        lhs.partial_cmp(&rhs)
+    }
+}
+
 #[allow(dead_code)]
 impl OraclePrice {
-    pub const USD_DECIMALS: u8 = 8;
-
     pub fn new(price: u64, exponent: i32) -> Self {
         Self { price, exponent }
     }
@@ -59,7 +79,7 @@ impl OraclePrice {
     pub fn new_from_oracle(
         oracle_type: OracleType,
         oracle_account: &AccountInfo,
-        max_price_error: f64,
+        max_price_error: u64,
         max_price_age_sec: u32,
         current_time: i64,
     ) -> Result<Self> {
@@ -75,6 +95,32 @@ impl OraclePrice {
                 max_price_error,
                 max_price_age_sec,
                 current_time,
+                false,
+            ),
+            _ => err!(PerpetualsError::UnsupportedOracle),
+        }
+    }
+
+    pub fn new_from_oracle_ema(
+        oracle_type: OracleType,
+        oracle_account: &AccountInfo,
+        max_price_error: u64,
+        max_price_age_sec: u32,
+        current_time: i64,
+    ) -> Result<Self> {
+        match oracle_type {
+            OracleType::Test => Self::get_test_price(
+                oracle_account,
+                max_price_error,
+                max_price_age_sec,
+                current_time,
+            ),
+            OracleType::Pyth => Self::get_pyth_price(
+                oracle_account,
+                max_price_error,
+                max_price_age_sec,
+                current_time,
+                true,
             ),
             _ => err!(PerpetualsError::UnsupportedOracle),
         }
@@ -108,7 +154,7 @@ impl OraclePrice {
             -(token_decimals as i32),
             self.price,
             self.exponent,
-            -(Self::USD_DECIMALS as i32),
+            -(Perpetuals::USD_DECIMALS as i32),
         )
     }
 
@@ -119,7 +165,7 @@ impl OraclePrice {
         }
         math::checked_decimal_div(
             asset_amount_usd,
-            -(Self::USD_DECIMALS as i32),
+            -(Perpetuals::USD_DECIMALS as i32),
             self.price,
             self.exponent,
             -(token_decimals as i32),
@@ -190,7 +236,7 @@ impl OraclePrice {
     // private helpers
     fn get_test_price(
         test_price_info: &AccountInfo,
-        max_price_error: f64,
+        max_price_error: u64,
         max_price_age_sec: u32,
         current_time: i64,
     ) -> Result<OraclePrice> {
@@ -208,8 +254,10 @@ impl OraclePrice {
         }
 
         if oracle_acc.price == 0
-            || math::checked_float_div(oracle_acc.conf as f64, oracle_acc.price as f64)?
-                > max_price_error
+            || math::checked_div(
+                math::checked_mul(oracle_acc.conf as u128, Perpetuals::BPS_POWER)?,
+                oracle_acc.price as u128,
+            )? > max_price_error as u128
         {
             msg!("Error: Test oracle price is out of bounds");
             return err!(PerpetualsError::InvalidOraclePrice);
@@ -224,9 +272,10 @@ impl OraclePrice {
 
     fn get_pyth_price(
         pyth_price_info: &AccountInfo,
-        max_price_error: f64,
+        max_price_error: u64,
         max_price_age_sec: u32,
         current_time: i64,
+        use_ema: bool,
     ) -> Result<OraclePrice> {
         require!(
             !state::is_empty_account(pyth_price_info)?,
@@ -234,9 +283,15 @@ impl OraclePrice {
         );
         let price_feed = pyth_sdk_solana::load_price_feed_from_account_info(pyth_price_info)
             .map_err(|_| PerpetualsError::InvalidOracleAccount)?;
-        let pyth_price = price_feed
-            .get_current_price()
-            .ok_or(PerpetualsError::InvalidOracleState)?;
+        let pyth_price = if use_ema {
+            price_feed
+                .get_ema_price()
+                .ok_or(PerpetualsError::InvalidOracleState)?
+        } else {
+            price_feed
+                .get_current_price()
+                .ok_or(PerpetualsError::InvalidOracleState)?
+        };
 
         let last_update_age_sec = math::checked_sub(current_time, price_feed.publish_time)?;
         if last_update_age_sec > max_price_age_sec as i64 {
@@ -245,8 +300,10 @@ impl OraclePrice {
         }
 
         if pyth_price.price <= 0
-            || math::checked_float_div(pyth_price.conf as f64, pyth_price.price as f64)?
-                > max_price_error
+            || math::checked_div(
+                math::checked_mul(pyth_price.conf as u128, Perpetuals::BPS_POWER)?,
+                pyth_price.price as u128,
+            )? > max_price_error as u128
         {
             msg!("Error: Pyth oracle price is out of bounds");
             return err!(PerpetualsError::InvalidOraclePrice);

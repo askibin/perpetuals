@@ -1,19 +1,37 @@
+use super::perpetuals::Perpetuals;
+
 use {
     crate::state::{
-        oracle::OracleType,
+        oracle::{OraclePrice, OracleType},
         perpetuals::{Fee, Permissions},
     },
     anchor_lang::prelude::*,
 };
 
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Debug)]
+pub enum FeesMode {
+    Fixed,
+    Linear,
+}
+
+impl Default for FeesMode {
+    fn default() -> Self {
+        Self::Linear
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct Fees {
-    pub swap: Fee,
-    pub add_liquidity: Fee,
-    pub remove_liquidity: Fee,
-    pub open_position: Fee,
-    pub close_position: Fee,
-    pub liquidation: Fee,
+    pub mode: FeesMode,
+    // fees have implied BPS_DECIMALS decimals
+    pub max_change: u64,
+    pub swap: u64,
+    pub add_liquidity: u64,
+    pub remove_liquidity: u64,
+    pub open_position: u64,
+    pub close_position: u64,
+    pub liquidation: u64,
+    pub protocol_share: u64,
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
@@ -40,6 +58,7 @@ pub struct VolumeStats {
 pub struct TradeStats {
     pub profit: u64,
     pub loss: u64,
+    // open interest
     pub oi_long: u64,
     pub oi_short: u64,
 }
@@ -47,8 +66,11 @@ pub struct TradeStats {
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct Assets {
     pub collateral: u64,
-    pub fees: u64,
+    // protocol_fees are part of the collected fees that is reserved for the protocol
+    pub protocol_fees: u64,
+    // owned = total_assets - collateral + collected_fees - protocol_fees
     pub owned: u64,
+    // locked funds for pnl payoff
     pub locked: u64,
 }
 
@@ -56,8 +78,37 @@ pub struct Assets {
 pub struct OracleParams {
     pub oracle_account: Pubkey,
     pub oracle_type: OracleType,
-    pub max_price_error: f64,
+    pub max_price_error: u64,
     pub max_price_age_sec: u32,
+}
+
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
+pub struct PricingParams {
+    pub use_ema: bool,
+    // spreads have implied BPS_DECIMALS decimals
+    pub trade_spread_long: u64,
+    pub trade_spread_short: u64,
+    pub swap_spread: u64,
+    pub swap_spread: u64,
+}
+
+impl Fees {
+    pub fn validate(&self) -> bool {
+        self.max_change as u128 >= Perpetuals::BPS_POWER
+            && self.swap as u128 <= Perpetuals::BPS_POWER
+            && self.add_liquidity as u128 <= Perpetuals::BPS_POWER
+            && self.remove_liquidity as u128 <= Perpetuals::BPS_POWER
+            && self.open_position as u128 <= Perpetuals::BPS_POWER
+            && self.close_position as u128 <= Perpetuals::BPS_POWER
+            && self.liquidation as u128 <= Perpetuals::BPS_POWER
+            && self.protocol_share as u128 <= Perpetuals::BPS_POWER
+    }
+}
+
+impl OracleParams {
+    pub fn validate(&self) -> bool {
+        self.oracle_type == OracleType::None || self.oracle_account != Pubkey::default()
+    }
 }
 
 #[account]
@@ -67,6 +118,7 @@ pub struct Custody {
     pub mint: Pubkey,
     pub decimals: u8,
     pub oracle: OracleParams,
+    pub pricing: PricingParams,
     pub permissions: Permissions,
     pub fees: Fees,
 
@@ -83,8 +135,9 @@ impl Custody {
     pub const LEN: usize = 8 + std::mem::size_of::<Custody>();
 
     pub fn validate(&self) -> bool {
-        matches!(self.oracle.oracle_type, OracleType::None)
-            || (self.oracle.oracle_account != Pubkey::default()
-                && self.oracle.max_price_error >= 0.0)
+        self.token_account != Pubkey::default()
+            && self.mint != Pubkey::default()
+            && self.oracle.validate()
+            && self.fees.validate()
     }
 }

@@ -120,12 +120,13 @@ pub fn withdraw_fees<'info>(
         msg!(
             "Withdraw token fees: {} / {}",
             params.token_amount,
-            custody.assets.fees
+            custody.assets.protocol_fees
         );
-        if custody.assets.fees < params.token_amount {
+        if custody.assets.protocol_fees < params.token_amount {
             return Err(ProgramError::InsufficientFunds.into());
         }
-        custody.assets.fees = math::checked_sub(custody.assets.fees, params.token_amount)?;
+        custody.assets.protocol_fees =
+            math::checked_sub(custody.assets.protocol_fees, params.token_amount)?;
 
         ctx.accounts.perpetuals.transfer_tokens(
             ctx.accounts.custody_token_account.to_account_info(),

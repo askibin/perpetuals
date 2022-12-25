@@ -86,8 +86,8 @@ pub struct AddLiquidity<'info> {
 
     token_program: Program<'info, Token>,
     // remaining accounts:
-    //   pool.tokens.len()-1 custody accounts except receiving (read-only, unsigned)
-    //   pool.tokens.len()-1 custody oracles except receiving (read-only, unsigned)
+    //   pool.tokens.len()-1 custody accounts except already provided (read-only, unsigned)
+    //   pool.tokens.len()-1 custody oracles except already provided (read-only, unsigned)
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -114,14 +114,16 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     let token_id = pool.get_token_id(&custody.key())?;
 
     // calculate fee
-    let fee = pool.get_add_liquidity_fee(token_id)?;
+    let fee = pool.get_add_liquidity_fee(0, &[&custody])?;
     let fee_amount = fee.get_fee_amount(params.amount)?;
     msg!("Collected fee: {}", fee_amount);
 
     // check pool constraints
     msg!("Check pool constraints");
+    let protocol_fee = custody.fees.protocol_share.get_fee_amount(fee_amount)?;
+    let deposit_amount = math::checked_sub(params.amount, protocol_fee)?;
     require!(
-        pool.check_amount_in(token_id, params.amount)?,
+        pool.check_amount_in(token_id, deposit_amount)?,
         PerpetualsError::PoolAmountLimit
     );
 
@@ -140,7 +142,7 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     let curtime = perpetuals.get_time()?;
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
-        &custody.to_account_info(),
+        &ctx.accounts.custody_oracle_account.to_account_info(),
         custody.oracle.max_price_error,
         custody.oracle.max_price_age_sec,
         curtime,
@@ -182,19 +184,24 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
         lp_amount,
     )?;
 
+    // update custody stats
+    msg!("Update custody stats");
+    custody.collected_fees.add_liquidity = custody
+        .collected_fees
+        .add_liquidity
+        .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+
+    custody.volume_stats.add_liquidity = custody
+        .volume_stats
+        .add_liquidity
+        .wrapping_add(token_price.get_asset_amount_usd(params.amount, custody.decimals)?);
+
+    custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
+    custody.assets.owned = math::checked_add(custody.assets.owned, deposit_amount)?;
+
     // update pool stats
     msg!("Update pool stats");
-    custody.collected_fees.add_liquidity = math::checked_add(
-        custody.collected_fees.add_liquidity,
-        token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
-    )?;
-    custody.volume_stats.add_liquidity = math::checked_add(
-        custody.volume_stats.add_liquidity,
-        token_price.get_asset_amount_usd(params.amount, custody.decimals)?,
-    )?;
-
-    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
-    custody.assets.owned = math::checked_add(custody.assets.owned, params.amount)?;
+    pool.aum_usd = pool_amount_usd;
 
     Ok(())
 }

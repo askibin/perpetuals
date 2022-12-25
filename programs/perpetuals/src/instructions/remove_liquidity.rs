@@ -85,8 +85,8 @@ pub struct RemoveLiquidity<'info> {
 
     token_program: Program<'info, Token>,
     // remaining accounts:
-    //   pool.tokens.len() - 1 custody accounts except receiving (write, unsigned)
-    //   pool.tokens.len() - 1 custody oracles except receiving (write, unsigned)
+    //   pool.tokens.len() - 1 custody accounts except already provided (read-only, unsigned)
+    //   pool.tokens.len() - 1 custody oracles except already provided (read-only, unsigned)
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
@@ -113,9 +113,6 @@ pub fn remove_liquidity(
         return Err(ProgramError::InvalidArgument.into());
     }
     let pool = ctx.accounts.pool.as_mut();
-    if pool.tokens.len() > 1 && ctx.remaining_accounts.len() < (pool.tokens.len() - 1) * 2 {
-        return Err(ProgramError::NotEnoughAccountKeys.into());
-    }
     let token_id = pool.get_token_id(&custody.key())?;
 
     // compute assets under management
@@ -123,7 +120,7 @@ pub fn remove_liquidity(
     let curtime = perpetuals.get_time()?;
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
-        &custody.to_account_info(),
+        &ctx.accounts.custody_oracle_account.to_account_info(),
         custody.oracle.max_price_error,
         custody.oracle.max_price_age_sec,
         curtime,
@@ -140,20 +137,22 @@ pub fn remove_liquidity(
         math::checked_mul(pool_amount_usd as u128, params.lp_amount as u128)?,
         ctx.accounts.lp_token_mint.supply as u128,
     )?)?;
-    let mut remove_amount = token_price.get_token_amount(remove_amount_usd, custody.decimals)?;
+    let remove_amount = token_price.get_token_amount(remove_amount_usd, custody.decimals)?;
 
     // calculate fee
-    let fee = pool.get_remove_liquidity_fee(token_id)?;
+    let fee = pool.get_remove_liquidity_fee(0, &[&custody])?;
     let fee_amount = fee.get_fee_amount(remove_amount)?;
     msg!("Collected fee: {}", fee_amount);
 
-    remove_amount = math::checked_sub(remove_amount, fee_amount)?;
-    msg!("Amount out: {}", remove_amount);
+    let no_fee_amount = math::checked_sub(remove_amount, fee_amount)?;
+    msg!("Amount out: {}", no_fee_amount);
 
     // check pool constraints
     msg!("Check pool constraints");
+    let protocol_fee = custody.fees.protocol_share.get_fee_amount(fee_amount)?;
+    let withdrawal_amount = math::checked_add(no_fee_amount, protocol_fee)?;
     require!(
-        pool.check_amount_out(token_id, remove_amount)?,
+        pool.check_amount_out(token_id, withdrawal_amount)?,
         PerpetualsError::PoolAmountLimit
     );
 
@@ -164,7 +163,7 @@ pub fn remove_liquidity(
         ctx.accounts.receiving_account.to_account_info(),
         ctx.accounts.transfer_authority.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
-        remove_amount,
+        no_fee_amount,
     )?;
 
     // burn lp tokens
@@ -172,22 +171,29 @@ pub fn remove_liquidity(
     perpetuals.burn_tokens(
         ctx.accounts.lp_token_mint.to_account_info(),
         ctx.accounts.lp_token_account.to_account_info(),
-        ctx.accounts.transfer_authority.to_account_info(),
+        ctx.accounts.owner.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
         params.lp_amount,
     )?;
 
+    // update custody stats
+    msg!("Update custody stats");
+    custody.collected_fees.remove_liquidity = custody
+        .collected_fees
+        .remove_liquidity
+        .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+
+    custody.volume_stats.remove_liquidity = custody
+        .volume_stats
+        .remove_liquidity
+        .wrapping_add(remove_amount_usd);
+
+    custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
+    custody.assets.owned = math::checked_sub(custody.assets.owned, withdrawal_amount)?;
+
     // update pool stats
     msg!("Update pool stats");
-    custody.collected_fees.remove_liquidity = math::checked_add(
-        custody.collected_fees.remove_liquidity,
-        token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
-    )?;
-    custody.volume_stats.remove_liquidity =
-        math::checked_add(custody.volume_stats.remove_liquidity, remove_amount_usd)?;
-
-    custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
-    custody.assets.owned = math::checked_sub(custody.assets.owned, remove_amount)?;
+    pool.aum_usd = pool_amount_usd;
 
     Ok(())
 }

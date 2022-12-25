@@ -86,6 +86,13 @@ pub fn checked_decimal_div(
     exponent2: i32,
     target_exponent: i32,
 ) -> Result<u64> {
+    if coefficient2 == 0 {
+        msg!("Error: Overflow in {} / {}", coefficient1, coefficient2);
+        return err!(PerpetualsError::MathOverflow);
+    }
+    if coefficient1 == 0 {
+        return Ok(0);
+    }
     // compute scale factor for the dividend
     let mut scale_factor = 0;
     let mut target_power = checked_sub(checked_sub(exponent1, exponent2)?, target_exponent)?;
@@ -129,6 +136,13 @@ pub fn checked_decimal_ceil_div(
     exponent2: i32,
     target_exponent: i32,
 ) -> Result<u64> {
+    if coefficient2 == 0 {
+        msg!("Error: Overflow in {} / {}", coefficient1, coefficient2);
+        return err!(PerpetualsError::MathOverflow);
+    }
+    if coefficient1 == 0 {
+        return Ok(0);
+    }
     // compute scale factor for the dividend
     let mut scale_factor = 0;
     let mut target_power = checked_sub(checked_sub(exponent1, exponent2)?, target_exponent)?;
@@ -216,6 +230,9 @@ pub fn checked_decimal_mul(
     exponent2: i32,
     target_exponent: i32,
 ) -> Result<u64> {
+    if coefficient1 == 0 || coefficient2 == 0 {
+        return Ok(0);
+    }
     let target_power = checked_sub(checked_add(exponent1, exponent2)?, target_exponent)?;
     if target_power >= 0 {
         checked_as_u64(checked_mul(
@@ -237,6 +254,9 @@ pub fn checked_decimal_ceil_mul(
     exponent2: i32,
     target_exponent: i32,
 ) -> Result<u64> {
+    if coefficient1 == 0 || coefficient2 == 0 {
+        return Ok(0);
+    }
     let target_power = checked_sub(checked_add(exponent1, exponent2)?, target_exponent)?;
     if target_power >= 0 {
         checked_as_u64(checked_mul(

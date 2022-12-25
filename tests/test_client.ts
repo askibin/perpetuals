@@ -16,6 +16,8 @@ import {
 import * as spl from "@solana/spl-token";
 import { BN } from "bn.js";
 
+export type PositionSide = "long" | "short";
+
 export class TestClient {
   provider: anchor.AnchorProvider;
   program: anchor.Program<Perpetuals>;
@@ -46,8 +48,8 @@ export class TestClient {
     wallet: Keypair;
     tokenAccounts: PublicKey[];
     lpTokenAccount: PublicKey;
-    positionAccountsBuy: PublicKey[];
-    positionAccountsSell: PublicKey[];
+    positionAccountsLong: PublicKey[];
+    positionAccountsShort: PublicKey[];
   }[];
 
   constructor() {
@@ -120,8 +122,8 @@ export class TestClient {
       await this.requestAirdrop(wallet.publicKey);
 
       let tokenAccounts = [];
-      let positionAccountsBuy = [];
-      let positionAccountsSell = [];
+      let positionAccountsLong = [];
+      let positionAccountsShort = [];
       for (const custody of this.custodies) {
         let tokenAccount = await spl.createAssociatedTokenAccount(
           this.provider.connection,
@@ -137,29 +139,33 @@ export class TestClient {
         );
         tokenAccounts.push(tokenAccount);
 
-        let positionAccount = await this.findProgramAddress("position", [
-          wallet.publicKey,
-          this.pool.publicKey,
-          custody.custody,
-          /*[0],*/
-        ]);
-        positionAccountsBuy.push(positionAccount);
+        let positionAccount = (
+          await this.findProgramAddress("position", [
+            wallet.publicKey,
+            this.pool.publicKey,
+            custody.custody,
+            [1],
+          ])
+        ).publicKey;
+        positionAccountsLong.push(positionAccount);
 
-        positionAccount = await this.findProgramAddress("position", [
-          wallet.publicKey,
-          this.pool.publicKey,
-          custody.custody,
-          /*[1]*/
-        ]);
-        positionAccountsSell.push(positionAccount);
+        positionAccount = (
+          await this.findProgramAddress("position", [
+            wallet.publicKey,
+            this.pool.publicKey,
+            custody.custody,
+            [2],
+          ])
+        ).publicKey;
+        positionAccountsShort.push(positionAccount);
       }
 
       this.users.push({
-        wallet: wallet,
-        tokenAccounts: tokenAccounts,
+        wallet,
+        tokenAccounts,
         lpTokenAccount: PublicKey.default,
-        positionAccountsBuy: positionAccountsBuy,
-        positionAccountsSell: positionAccountsSell,
+        positionAccountsLong,
+        positionAccountsShort,
       });
     }
   };
@@ -208,22 +214,24 @@ export class TestClient {
       ])
     ).publicKey;
     return {
-      mint: mint,
-      tokenAccount: tokenAccount,
-      oracleAccount: oracleAccount,
-      custody: custody,
-      decimals: decimals,
+      mint,
+      tokenAccount,
+      oracleAccount,
+      custody,
+      decimals,
     };
   };
 
-  findProgramAddress = async (label: string, extra_seeds = null) => {
+  findProgramAddress = async (label: string, extraSeeds = null) => {
     let seeds = [Buffer.from(anchor.utils.bytes.utf8.encode(label))];
-    if (extra_seeds) {
-      for (let extra_seed of extra_seeds) {
-        if (typeof extra_seed === "string") {
-          seeds.push(Buffer.from(anchor.utils.bytes.utf8.encode(extra_seed)));
+    if (extraSeeds) {
+      for (let extraSeed of extraSeeds) {
+        if (typeof extraSeed === "string") {
+          seeds.push(Buffer.from(anchor.utils.bytes.utf8.encode(extraSeed)));
+        } else if (Array.isArray(extraSeed)) {
+          seeds.push(Buffer.from(extraSeed));
         } else {
-          seeds.push(extra_seed.toBuffer());
+          seeds.push(extraSeed.toBuffer());
         }
       }
     }
@@ -359,7 +367,7 @@ export class TestClient {
       try {
         await this.program.methods
           .setAdminSigners({
-            minSignatures: minSignatures,
+            minSignatures,
           })
           .accounts({
             admin: this.admins[i].publicKey,
@@ -429,6 +437,17 @@ export class TestClient {
         throw err;
       }
     }
+
+    // set lp token accounts
+    for (let i = 0; i < 2; ++i) {
+      let tokenAccount = await spl.getOrCreateAssociatedTokenAccount(
+        this.provider.connection,
+        this.admins[0],
+        this.lpToken.publicKey,
+        this.users[i].wallet.publicKey
+      );
+      this.users[i].lpTokenAccount = tokenAccount.address;
+    }
   };
 
   removePool = async () => {
@@ -467,8 +486,8 @@ export class TestClient {
         await this.program.methods
           .addToken({
             oracle: oracleConfig,
-            permissions: permissions,
-            fees: fees,
+            permissions,
+            fees,
             targetRatio: ratios.target,
             minRatio: ratios.min,
             maxRatio: ratios.max,
@@ -536,8 +555,8 @@ export class TestClient {
         await this.program.methods
           .setTokenConfig({
             oracle: oracleConfig,
-            permissions: permissions,
-            fees: fees,
+            permissions,
+            fees,
             targetRatio: ratios.target,
             minRatio: ratios.min,
             maxRatio: ratios.max,
@@ -560,8 +579,8 @@ export class TestClient {
   };
 
   withdrawFees = async (
-    tokenAmount: number,
-    solAmount: number,
+    tokenAmount: typeof BN,
+    solAmount: typeof BN,
     custody,
     receivingTokenAccount,
     receivingSolAccount
@@ -573,8 +592,8 @@ export class TestClient {
       try {
         await this.program.methods
           .withdrawFees({
-            tokenAmount: new BN(tokenAmount),
-            solAmount: new BN(solAmount),
+            tokenAmount,
+            solAmount,
           })
           .accounts({
             admin: this.admins[i].publicKey,
@@ -659,24 +678,24 @@ export class TestClient {
   };
 
   swap = async (
-    amountIn: number,
-    minAmountOut: number,
+    amountIn: typeof BN,
+    minAmountOut: typeof BN,
     user,
-    tokenIdIn: number,
-    tokenIdOut: number,
+    fundingAccount: PublicKey,
+    receivingAccount: PublicKey,
     custodyIn,
     custodyOut
   ) => {
     try {
       await this.program.methods
         .swap({
-          amountIn: new BN(amountIn),
-          minAmountOut: new BN(minAmountOut),
+          amountIn,
+          minAmountOut,
         })
         .accounts({
           owner: user.wallet.publicKey,
-          fundingAccount: user.tokenAccounts[tokenIdIn],
-          receivingAccount: user.tokenAccounts[tokenIdOut],
+          fundingAccount: fundingAccount,
+          receivingAccount,
           transferAuthority: this.authority.publicKey,
           perpetuals: this.perpetuals.publicKey,
           pool: this.pool.publicKey,
@@ -698,15 +717,38 @@ export class TestClient {
     }
   };
 
-  addLiquidity = async (amount: number, user, tokenId: number, custody) => {
+  addLiquidity = async (
+    amount: typeof BN,
+    user,
+    fundingAccount: PublicKey,
+    custody,
+    remainingCustodyAccounts,
+    remainingCustodyOracles
+  ) => {
+    let remainingAccountMetas = [];
+    for (const account of remainingCustodyAccounts) {
+      remainingAccountMetas.push({
+        isSigner: false,
+        isWritable: false,
+        pubkey: account,
+      });
+    }
+    for (const account of remainingCustodyOracles) {
+      remainingAccountMetas.push({
+        isSigner: false,
+        isWritable: false,
+        pubkey: account,
+      });
+    }
+
     try {
       await this.program.methods
         .addLiquidity({
-          amount: new BN(amount),
+          amount,
         })
         .accounts({
           owner: user.wallet.publicKey,
-          fundingAccount: user.tokenAccounts[tokenId],
+          fundingAccount,
           lpTokenAccount: user.lpTokenAccount,
           transferAuthority: this.authority.publicKey,
           perpetuals: this.perpetuals.publicKey,
@@ -717,6 +759,7 @@ export class TestClient {
           lpTokenMint: this.lpToken.publicKey,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
+        .remainingAccounts(remainingAccountMetas)
         .signers([user.wallet])
         .rpc();
     } catch (err) {
@@ -728,19 +771,37 @@ export class TestClient {
   };
 
   removeLiquidity = async (
-    lpAmount: number,
+    lpAmount: typeof BN,
     user,
-    tokenId: number,
-    custody
+    receivingAccount: PublicKey,
+    custody,
+    remainingCustodyAccounts,
+    remainingCustodyOracles
   ) => {
+    let remainingAccountMetas = [];
+    for (const account of remainingCustodyAccounts) {
+      remainingAccountMetas.push({
+        isSigner: false,
+        isWritable: false,
+        pubkey: account,
+      });
+    }
+    for (const account of remainingCustodyOracles) {
+      remainingAccountMetas.push({
+        isSigner: false,
+        isWritable: false,
+        pubkey: account,
+      });
+    }
+
     try {
       await this.program.methods
         .removeLiquidity({
-          lpAmount: new BN(lpAmount),
+          lpAmount,
         })
         .accounts({
           owner: user.wallet.publicKey,
-          receivingAccount: user.tokenAccounts[tokenId],
+          receivingAccount: receivingAccount,
           lpTokenAccount: user.lpTokenAccount,
           transferAuthority: this.authority.publicKey,
           perpetuals: this.perpetuals.publicKey,
@@ -751,6 +812,7 @@ export class TestClient {
           lpTokenMint: this.lpToken.publicKey,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
+        .remainingAccounts(remainingAccountMetas)
         .signers([user.wallet])
         .rpc();
     } catch (err) {
@@ -763,31 +825,29 @@ export class TestClient {
 
   openPosition = async (
     price: number,
-    collateral: number,
-    size: number,
-    side,
+    collateral: typeof BN,
+    size: typeof BN,
+    side: PositionSide,
     user,
-    tokenId: number,
+    fundingAccount: PublicKey,
+    positionAccount: PublicKey,
     custody
   ) => {
     try {
       await this.program.methods
         .openPosition({
           price: new BN(price),
-          collateral: new BN(collateral),
-          size: new BN(size),
-          side: side,
+          collateral,
+          size,
+          side: side === "long" ? { long: {} } : { short: {} },
         })
         .accounts({
           owner: user.wallet.publicKey,
-          fundingAccount: user.tokenAccounts[tokenId],
+          fundingAccount,
           transferAuthority: this.authority.publicKey,
           perpetuals: this.perpetuals.publicKey,
           pool: this.pool.publicKey,
-          position:
-            side === "buy"
-              ? user.positionAccountsBuy[tokenId]
-              : user.positionAccountsSell[tokenId],
+          position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
           custodyTokenAccount: custody.tokenAccount,
@@ -806,34 +866,31 @@ export class TestClient {
 
   closePosition = async (
     price: number,
-    size: number,
-    collateralOnly: number,
-    sizeOnly: number,
-    profitOnly: number,
-    side,
+    size: typeof BN,
+    collateralOnly: typeof BN,
+    sizeOnly: typeof BN,
+    profitOnly: typeof BN,
     user,
-    tokenId: number,
+    receivingAccount,
+    positionAccount,
     custody
   ) => {
     try {
       await this.program.methods
         .closePosition({
           price: new BN(price),
-          size: new BN(size),
-          collateralOnly: new BN(collateralOnly),
-          sizeOnly: new BN(sizeOnly),
-          profitOnly: new BN(profitOnly),
+          size: size,
+          collateralOnly: collateralOnly,
+          sizeOnly: sizeOnly,
+          profitOnly: profitOnly,
         })
         .accounts({
           owner: user.wallet.publicKey,
-          receivingAccount: user.tokenAccounts[tokenId],
+          receivingAccount,
           transferAuthority: this.authority.publicKey,
           perpetuals: this.perpetuals.publicKey,
           pool: this.pool.publicKey,
-          position:
-            side === "buy"
-              ? user.positionAccountsBuy[tokenId]
-              : user.positionAccountsSell[tokenId],
+          position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
           custodyTokenAccount: custody.tokenAccount,
@@ -849,21 +906,23 @@ export class TestClient {
     }
   };
 
-  liquidate = async (side, user, tokenId: number, custody) => {
+  liquidate = async (
+    user,
+    tokenAccount: PublicKey,
+    positionAccount: PublicKey,
+    custody
+  ) => {
     try {
       await this.program.methods
         .liquidate({})
         .accounts({
           signer: user.wallet.publicKey,
-          receivingAccount: user.tokenAccounts[tokenId],
-          rewardsReceivingAccount: user.tokenAccounts[tokenId],
+          receivingAccount: tokenAccount,
+          rewardsReceivingAccount: tokenAccount,
           transferAuthority: this.authority.publicKey,
           perpetuals: this.perpetuals.publicKey,
           pool: this.pool.publicKey,
-          position:
-            side === "buy"
-              ? user.positionAccountsBuy[tokenId]
-              : user.positionAccountsSell[tokenId],
+          position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
           custodyTokenAccount: custody.tokenAccount,
@@ -879,12 +938,16 @@ export class TestClient {
     }
   };
 
-  getEntryPriceAndFee = async (size: number, side, custody) => {
+  getEntryPriceAndFee = async (
+    size: typeof BN,
+    side: PositionSide,
+    custody
+  ) => {
     try {
       return await this.program.methods
         .getEntryPriceAndFee({
-          size: new BN(size),
-          side: side,
+          size,
+          side: side === "long" ? { long: {} } : { short: {} },
         })
         .accounts({
           signer: this.provider.wallet.publicKey,
@@ -902,20 +965,21 @@ export class TestClient {
     }
   };
 
-  getExitPriceAndFee = async (size: number, side, user, tokenId, custody) => {
+  getExitPriceAndFee = async (
+    size: typeof BN,
+    positionAccount: PublicKey,
+    custody
+  ) => {
     try {
       return await this.program.methods
         .getExitPriceAndFee({
-          size: new BN(size),
+          size,
         })
         .accounts({
           signer: this.provider.wallet.publicKey,
           perpetuals: this.perpetuals.publicKey,
           pool: this.pool.publicKey,
-          position:
-            side === "buy"
-              ? user.positionAccountsBuy[tokenId]
-              : user.positionAccountsSell[tokenId],
+          position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
         })
@@ -928,7 +992,7 @@ export class TestClient {
     }
   };
 
-  getLiquidationPrice = async (side, user, tokenId, custody) => {
+  getLiquidationPrice = async (positionAccount: PublicKey, custody) => {
     try {
       return await this.program.methods
         .getLiquidationPrice({})
@@ -936,10 +1000,7 @@ export class TestClient {
           signer: this.provider.wallet.publicKey,
           perpetuals: this.perpetuals.publicKey,
           pool: this.pool.publicKey,
-          position:
-            side === "buy"
-              ? user.positionAccountsBuy[tokenId]
-              : user.positionAccountsSell[tokenId],
+          position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
         })
@@ -952,13 +1013,7 @@ export class TestClient {
     }
   };
 
-  getSwapAmountAndFee = async (
-    amountIn: number,
-    user,
-    tokenId,
-    custodyIn,
-    custodyOut
-  ) => {
+  getSwapAmountAndFee = async (amountIn: number, custodyIn, custodyOut) => {
     try {
       return await this.program.methods
         .getSwapAmountAndFee({

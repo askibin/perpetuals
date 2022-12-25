@@ -5,12 +5,6 @@ use {
 };
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
-pub struct Fee {
-    numerator: u64,
-    denominator: u64,
-}
-
-#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct PriceAndFee {
     pub price: u64,
     pub fee: u64,
@@ -47,22 +41,6 @@ pub struct Perpetuals {
     pub inception_time: i64,
 }
 
-impl Fee {
-    pub fn is_zero(&self) -> bool {
-        self.numerator == 0
-    }
-
-    pub fn get_fee_amount(&self, amount: u64) -> Result<u64> {
-        if self.is_zero() {
-            return Ok(0);
-        }
-        math::checked_as_u64(math::checked_ceil_div(
-            math::checked_mul(amount as u128, self.numerator as u128)?,
-            self.denominator as u128,
-        )?)
-    }
-}
-
 impl anchor_lang::Id for Perpetuals {
     fn id() -> Pubkey {
         crate::ID
@@ -71,6 +49,11 @@ impl anchor_lang::Id for Perpetuals {
 
 impl Perpetuals {
     pub const LEN: usize = 8 + std::mem::size_of::<Perpetuals>();
+    pub const BPS_DECIMALS: u8 = 4;
+    pub const BPS_POWER: u128 = 10i64.pow(Self::BPS_DECIMALS as u32) as u128;
+    pub const PRICE_DECIMALS: u8 = 6;
+    pub const USD_DECIMALS: u8 = 6;
+    pub const LP_DECIMALS: u8 = Self::USD_DECIMALS;
 
     pub fn validate(&self) -> bool {
         true
@@ -166,9 +149,6 @@ impl Perpetuals {
         token_program: AccountInfo<'info>,
         amount: u64,
     ) -> Result<()> {
-        let authority_seeds: &[&[&[u8]]] =
-            &[&[b"transfer_authority", &[self.transfer_authority_bump]]];
-
         let context = CpiContext::new(
             token_program,
             Burn {
@@ -176,8 +156,7 @@ impl Perpetuals {
                 from,
                 authority,
             },
-        )
-        .with_signer(authority_seeds);
+        );
 
         anchor_spl::token::burn(context, amount)
     }

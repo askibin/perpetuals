@@ -86,14 +86,18 @@ pub fn get_swap_amount_and_fee(
     let dispensing_custody = ctx.accounts.dispensing_custody.as_mut();
     let received_token_price = OraclePrice::new_from_oracle(
         receiving_custody.oracle.oracle_type,
-        &receiving_custody.to_account_info(),
+        &ctx.accounts
+            .receiving_custody_oracle_account
+            .to_account_info(),
         receiving_custody.oracle.max_price_error,
         receiving_custody.oracle.max_price_age_sec,
         curtime,
     )?;
     let dispensed_token_price = OraclePrice::new_from_oracle(
         dispensing_custody.oracle.oracle_type,
-        &dispensing_custody.to_account_info(),
+        &ctx.accounts
+            .dispensing_custody_oracle_account
+            .to_account_info(),
         dispensing_custody.oracle.max_price_error,
         dispensing_custody.oracle.max_price_age_sec,
         curtime,
@@ -107,7 +111,7 @@ pub fn get_swap_amount_and_fee(
     )?;
 
     // calculate fee
-    let fee = pool.get_swap_fee(token_id_in, token_id_out)?;
+    let fee = pool.get_swap_fee(0, 0, &[&dispensing_custody])?;
     let fee_amount = fee.get_fee_amount(amount_out)?;
 
     Ok(AmountAndFee {

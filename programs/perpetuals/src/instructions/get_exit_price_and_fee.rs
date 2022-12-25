@@ -80,7 +80,7 @@ pub fn get_exit_price_and_fee(
     let custody = ctx.accounts.custody.as_mut();
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
-        &custody.to_account_info(),
+        &ctx.accounts.custody_oracle_account.to_account_info(),
         custody.oracle.max_price_error,
         custody.oracle.max_price_age_sec,
         curtime,
@@ -96,7 +96,7 @@ pub fn get_exit_price_and_fee(
     )?)?;
 
     // compute fee
-    let fee = pool.get_exit_fee(position)?;
+    let fee = pool.get_exit_fee(position, &[&custody])?;
     let fee_amount = fee.get_fee_amount(close_amount)?;
 
     Ok(PriceAndFee {

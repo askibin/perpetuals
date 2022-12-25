@@ -26,7 +26,8 @@ pub struct Position {
     pub size: u64,
     pub collateral: u64,
     pub interest_debt: u64,
-    pub unrealized_pnl: u64,
+    pub unrealized_profit: u64,
+    pub unrealized_loss: u64,
 
     pub bump: u8,
 }

@@ -125,7 +125,7 @@ describe("perpetuals", () => {
 
   it("addAndRemoveToken", async () => {
     oracleConfig = {
-      maxPriceError: 1,
+      maxPriceError: new BN(10000),
       maxPriceAgeSec: 60,
       oracleType: { test: {} },
       oracleAccount: tc.custodies[0].oracleAccount,
@@ -141,30 +141,14 @@ describe("perpetuals", () => {
       allowSizeChange: true,
     };
     fees = {
-      swap: {
-        numerator: new BN(1),
-        denominator: new BN(100),
-      },
-      addLiquidity: {
-        numerator: new BN(1),
-        denominator: new BN(100),
-      },
-      removeLiquidity: {
-        numerator: new BN(1),
-        denominator: new BN(100),
-      },
-      openPosition: {
-        numerator: new BN(1),
-        denominator: new BN(100),
-      },
-      closePosition: {
-        numerator: new BN(1),
-        denominator: new BN(100),
-      },
-      liquidation: {
-        numerator: new BN(1),
-        denominator: new BN(100),
-      },
+      mode: { test: {} },
+      maxChange: new BN(20000),
+      swap: new BN(100),
+      addLiquidity: new BN(100),
+      removeLiquidity: new BN(100),
+      openPosition: new BN(100),
+      closePosition: new BN(100),
+      liquidation: new BN(100),
     };
     ratios = {
       target: new BN(100),
@@ -181,7 +165,7 @@ describe("perpetuals", () => {
       oracle: {
         oracleAccount: tc.custodies[0].oracleAccount,
         oracleType: { test: {} },
-        maxPriceError: 1.0,
+        maxPriceError: "10000",
         maxPriceAgeSec: 60,
       },
       permissions: {
@@ -195,14 +179,16 @@ describe("perpetuals", () => {
         allowSizeChange: true,
       },
       fees: {
-        swap: { numerator: "1", denominator: "100" },
-        addLiquidity: { numerator: "1", denominator: "100" },
-        removeLiquidity: { numerator: "1", denominator: "100" },
-        openPosition: { numerator: "1", denominator: "100" },
-        closePosition: { numerator: "1", denominator: "100" },
-        liquidation: { numerator: "1", denominator: "100" },
+        mode: { linear: {} },
+        maxChange: "20000",
+        swap: "100",
+        addLiquidity: "100",
+        removeLiquidity: "100",
+        openPosition: "100",
+        closePosition: "100",
+        liquidation: "100",
       },
-      assets: { collateral: "0", fees: "0", owned: "0", locked: "0" },
+      assets: { collateral: "0", protocolFees: "0", owned: "0", locked: "0" },
       collectedFees: {
         swap: "0",
         addLiquidity: "0",
@@ -225,7 +211,15 @@ describe("perpetuals", () => {
     };
     expect(JSON.stringify(token)).to.equal(JSON.stringify(tokenExpected));
 
-    await tc.addToken(tc.custodies[1], oracleConfig, permissions, fees, ratios);
+    let oracleConfig2 = Object.assign({}, oracleConfig);
+    oracleConfig2.oracleAccount = tc.custodies[1].oracleAccount;
+    await tc.addToken(
+      tc.custodies[1],
+      oracleConfig2,
+      permissions,
+      fees,
+      ratios
+    );
 
     await tc.removeToken(tc.custodies[0]);
     tc.ensureFails(tc.program.account.custody.fetch(tc.custodies[0].custody));
@@ -236,7 +230,7 @@ describe("perpetuals", () => {
   it("setTokenConfig", async () => {
     oracleConfig.maxPriceAgeSec = 90;
     permissions.allowPnlWithdrawal = false;
-    fees.liquidation.numerator = new BN(0);
+    fees.liquidation = new BN(200);
     ratios.target = new BN(90);
     await tc.setTokenConfig(
       tc.custodies[0],
@@ -249,7 +243,7 @@ describe("perpetuals", () => {
     let token = await tc.program.account.custody.fetch(tc.custodies[0].custody);
     tokenExpected.oracle.maxPriceAgeSec = 90;
     tokenExpected.permissions.allowPnlWithdrawal = false;
-    tokenExpected.fees.liquidation.numerator = "0";
+    tokenExpected.fees.liquidation = "200";
     expect(JSON.stringify(token)).to.equal(JSON.stringify(tokenExpected));
   });
 
@@ -279,4 +273,90 @@ describe("perpetuals", () => {
       JSON.stringify(new BN(111))
     );
   });
+
+  it("addLiquidity", async () => {
+    await tc.addLiquidity(
+      tc.toTokenAmount(10, tc.custodies[0].decimals),
+      tc.users[0],
+      tc.users[0].tokenAccounts[0],
+      tc.custodies[0],
+      [tc.custodies[1].custody],
+      [tc.custodies[1].oracleAccount]
+    );
+    await tc.addLiquidity(
+      tc.toTokenAmount(10, tc.custodies[1].decimals),
+      tc.users[1],
+      tc.users[1].tokenAccounts[1],
+      tc.custodies[1],
+      [tc.custodies[0].custody],
+      [tc.custodies[0].oracleAccount]
+    );
+  });
+
+  it("swap", async () => {
+    await tc.swap(
+      tc.toTokenAmount(1, tc.custodies[0].decimals),
+      new BN(1),
+      tc.users[0],
+      tc.users[0].tokenAccounts[0],
+      tc.users[0].tokenAccounts[1],
+      tc.custodies[0],
+      tc.custodies[1]
+    );
+  });
+
+  it("removeLiquidity", async () => {
+    await tc.removeLiquidity(
+      tc.toTokenAmount(1, 6),
+      tc.users[0],
+      tc.users[0].tokenAccounts[0],
+      tc.custodies[0],
+      [tc.custodies[1].custody],
+      [tc.custodies[1].oracleAccount]
+    );
+    await tc.removeLiquidity(
+      tc.toTokenAmount(1, 6),
+      tc.users[1],
+      tc.users[1].tokenAccounts[1],
+      tc.custodies[1],
+      [tc.custodies[0].custody],
+      [tc.custodies[0].oracleAccount]
+    );
+  });
+
+  /*it("openPosition", async () => {
+    await tc.openPosition(
+      1123,
+      tc.toTokenAmount(1, tc.custodies[0].decimals),
+      tc.toTokenAmount(10, tc.custodies[0].decimals),
+      "long",
+      tc.users[0],
+      tc.users[0].tokenAccounts[0],
+      tc.users[0].positionAccountsLong[0],
+      tc.custodies[0]
+    );
+  });
+
+  it("closePosition", async () => {
+    await tc.closePosition(
+      0,
+      tc.toTokenAmount(1, tc.custodies[0].decimals),
+      new BN(0),
+      new BN(0),
+      new BN(0),
+      tc.users[0],
+      tc.users[0].tokenAccounts[0],
+      tc.users[0].positionAccountsLong[0],
+      tc.custodies[0]
+    );
+  });*/
+
+  /*  it("liquidate", async () => {
+    await tc.liquidate(
+      tc.users[0],
+      tc.users[0].tokenAccounts[0],
+      tc.users[0].positionAccountsLong[0],
+      tc.custodies[0]
+    );
+  });*/
 });
