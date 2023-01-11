@@ -23,7 +23,7 @@ impl Default for OracleType {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct OraclePrice {
     pub price: u64,
     pub exponent: i32,

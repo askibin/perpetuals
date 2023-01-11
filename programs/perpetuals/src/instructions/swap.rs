@@ -143,7 +143,25 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
         receiving_custody.oracle.max_price_age_sec,
         curtime,
     )?;
+    let received_token_ema_price = OraclePrice::new_from_oracle_ema(
+        receiving_custody.oracle.oracle_type,
+        &ctx.accounts
+            .receiving_custody_oracle_account
+            .to_account_info(),
+        receiving_custody.oracle.max_price_error,
+        receiving_custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
     let dispensed_token_price = OraclePrice::new_from_oracle(
+        dispensing_custody.oracle.oracle_type,
+        &ctx.accounts
+            .dispensing_custody_oracle_account
+            .to_account_info(),
+        dispensing_custody.oracle.max_price_error,
+        dispensing_custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+    let dispensed_token_ema_price = OraclePrice::new_from_oracle_ema(
         dispensing_custody.oracle.oracle_type,
         &ctx.accounts
             .dispensing_custody_oracle_account
@@ -156,17 +174,29 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
         token_id_in,
         token_id_out,
         &received_token_price,
+        &received_token_ema_price,
         &dispensed_token_price,
+        &dispensed_token_ema_price,
+        &receiving_custody,
+        &dispensing_custody,
         params.amount_in,
     )?;
 
     // calculate fee
-    let fee = pool.get_swap_fee(0, 0, &[&dispensing_custody])?;
-    let fee_amount = fee.get_fee_amount(amount_out)?;
-    msg!("Collected fee: {}", fee_amount);
+    let fees = pool.get_swap_fees(
+        token_id_in,
+        token_id_out,
+        params.amount_in,
+        amount_out,
+        &receiving_custody,
+        &received_token_price,
+        &dispensing_custody,
+        &dispensed_token_price,
+    )?;
+    msg!("Collected fees: {} {}", fees.0, fees.1);
 
     // check returned amount
-    let no_fee_amount = math::checked_sub(amount_out, fee_amount)?;
+    let no_fee_amount = math::checked_sub(amount_out, fees.1)?;
     msg!("Amount out: {}", no_fee_amount);
     require_gte!(
         no_fee_amount,
@@ -176,15 +206,24 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
 
     // check pool constraints
     msg!("Check pool constraints");
-    let protocol_fee = dispensing_custody
-        .fees
-        .protocol_share
-        .get_fee_amount(fee_amount)?;
-    let deposit_amount = math::checked_sub(params.amount_in, protocol_fee)?;
-    let withdrawal_amount = math::checked_add(no_fee_amount, protocol_fee)?;
+    let protocol_fee_in = Pool::get_fee_amount(receiving_custody.fees.protocol_share, fees.0)?;
+    let protocol_fee_out = Pool::get_fee_amount(dispensing_custody.fees.protocol_share, fees.1)?;
+    let deposit_amount = math::checked_sub(params.amount_in, protocol_fee_in)?;
+    let withdrawal_amount = math::checked_add(no_fee_amount, protocol_fee_out)?;
     require!(
-        pool.check_amount_in(token_id_in, deposit_amount)?
-            && pool.check_amount_out(token_id_out, withdrawal_amount)?,
+        pool.check_amount_in_out(
+            token_id_in,
+            deposit_amount,
+            0,
+            &receiving_custody,
+            &received_token_price
+        )? && pool.check_amount_in_out(
+            token_id_out,
+            0,
+            withdrawal_amount,
+            &dispensing_custody,
+            &dispensed_token_price
+        )?,
         PerpetualsError::PoolAmountLimit
     );
 
@@ -212,22 +251,28 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
 
     // update custody stats
     msg!("Update custody stats");
-    receiving_custody.volume_stats.swap = receiving_custody.volume_stats.swap.wrapping_add(
+    receiving_custody.volume_stats.swap_usd = receiving_custody.volume_stats.swap_usd.wrapping_add(
         received_token_price.get_asset_amount_usd(params.amount_in, receiving_custody.decimals)?,
     );
-
+    receiving_custody.collected_fees.swap_usd =
+        receiving_custody.collected_fees.swap_usd.wrapping_add(
+            dispensed_token_price.get_asset_amount_usd(fees.0, dispensing_custody.decimals)?,
+        );
     receiving_custody.assets.owned =
         math::checked_add(receiving_custody.assets.owned, deposit_amount)?;
+    receiving_custody.assets.protocol_fees =
+        math::checked_add(receiving_custody.assets.protocol_fees, protocol_fee_in)?;
 
-    dispensing_custody.collected_fees.swap = dispensing_custody.collected_fees.swap.wrapping_add(
-        dispensed_token_price.get_asset_amount_usd(fee_amount, dispensing_custody.decimals)?,
-    );
-    dispensing_custody.volume_stats.swap = dispensing_custody.volume_stats.swap.wrapping_add(
-        dispensed_token_price.get_asset_amount_usd(amount_out, dispensing_custody.decimals)?,
-    );
-
+    dispensing_custody.collected_fees.swap_usd =
+        dispensing_custody.collected_fees.swap_usd.wrapping_add(
+            dispensed_token_price.get_asset_amount_usd(fees.1, dispensing_custody.decimals)?,
+        );
+    dispensing_custody.volume_stats.swap_usd =
+        dispensing_custody.volume_stats.swap_usd.wrapping_add(
+            dispensed_token_price.get_asset_amount_usd(amount_out, dispensing_custody.decimals)?,
+        );
     dispensing_custody.assets.protocol_fees =
-        math::checked_add(dispensing_custody.assets.protocol_fees, protocol_fee)?;
+        math::checked_add(dispensing_custody.assets.protocol_fees, protocol_fee_out)?;
     dispensing_custody.assets.owned =
         math::checked_sub(dispensing_custody.assets.owned, withdrawal_amount)?;
 

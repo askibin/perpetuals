@@ -3,7 +3,7 @@ use super::perpetuals::Perpetuals;
 use {
     crate::state::{
         oracle::{OraclePrice, OracleType},
-        perpetuals::{Fee, Permissions},
+        perpetuals::Permissions,
     },
     anchor_lang::prelude::*,
 };
@@ -12,12 +12,6 @@ use {
 pub enum FeesMode {
     Fixed,
     Linear,
-}
-
-impl Default for FeesMode {
-    fn default() -> Self {
-        Self::Linear
-    }
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
@@ -36,31 +30,31 @@ pub struct Fees {
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct FeesStats {
-    pub swap: u64,
-    pub add_liquidity: u64,
-    pub remove_liquidity: u64,
-    pub open_position: u64,
-    pub close_position: u64,
-    pub liquidation: u64,
+    pub swap_usd: u64,
+    pub add_liquidity_usd: u64,
+    pub remove_liquidity_usd: u64,
+    pub open_position_usd: u64,
+    pub close_position_usd: u64,
+    pub liquidation_usd: u64,
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct VolumeStats {
-    pub swap: u64,
-    pub add_liquidity: u64,
-    pub remove_liquidity: u64,
-    pub open_position: u64,
-    pub close_position: u64,
-    pub liquidation: u64,
+    pub swap_usd: u64,
+    pub add_liquidity_usd: u64,
+    pub remove_liquidity_usd: u64,
+    pub open_position_usd: u64,
+    pub close_position_usd: u64,
+    pub liquidation_usd: u64,
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct TradeStats {
-    pub profit: u64,
-    pub loss: u64,
+    pub profit_usd: u64,
+    pub loss_usd: u64,
     // open interest
-    pub oi_long: u64,
-    pub oi_short: u64,
+    pub oi_long_usd: u64,
+    pub oi_short_usd: u64,
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
@@ -85,30 +79,13 @@ pub struct OracleParams {
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct PricingParams {
     pub use_ema: bool,
-    // spreads have implied BPS_DECIMALS decimals
+    // pricing params have implied BPS_DECIMALS decimals
     pub trade_spread_long: u64,
     pub trade_spread_short: u64,
     pub swap_spread: u64,
-    pub swap_spread: u64,
-}
-
-impl Fees {
-    pub fn validate(&self) -> bool {
-        self.max_change as u128 >= Perpetuals::BPS_POWER
-            && self.swap as u128 <= Perpetuals::BPS_POWER
-            && self.add_liquidity as u128 <= Perpetuals::BPS_POWER
-            && self.remove_liquidity as u128 <= Perpetuals::BPS_POWER
-            && self.open_position as u128 <= Perpetuals::BPS_POWER
-            && self.close_position as u128 <= Perpetuals::BPS_POWER
-            && self.liquidation as u128 <= Perpetuals::BPS_POWER
-            && self.protocol_share as u128 <= Perpetuals::BPS_POWER
-    }
-}
-
-impl OracleParams {
-    pub fn validate(&self) -> bool {
-        self.oracle_type == OracleType::None || self.oracle_account != Pubkey::default()
-    }
+    pub interest_per_sec: u64,
+    pub min_initial_leverage: u64,
+    pub max_leverage: u64,
 }
 
 #[account]
@@ -131,6 +108,37 @@ pub struct Custody {
     pub token_account_bump: u8,
 }
 
+impl Default for FeesMode {
+    fn default() -> Self {
+        Self::Linear
+    }
+}
+
+impl Fees {
+    pub fn validate(&self) -> bool {
+        self.max_change as u128 >= Perpetuals::BPS_POWER
+            && self.swap as u128 <= Perpetuals::BPS_POWER
+            && self.add_liquidity as u128 <= Perpetuals::BPS_POWER
+            && self.remove_liquidity as u128 <= Perpetuals::BPS_POWER
+            && self.open_position as u128 <= Perpetuals::BPS_POWER
+            && self.close_position as u128 <= Perpetuals::BPS_POWER
+            && self.liquidation as u128 <= Perpetuals::BPS_POWER
+            && self.protocol_share as u128 <= Perpetuals::BPS_POWER
+    }
+}
+
+impl OracleParams {
+    pub fn validate(&self) -> bool {
+        self.oracle_type == OracleType::None || self.oracle_account != Pubkey::default()
+    }
+}
+
+impl PricingParams {
+    pub fn validate(&self) -> bool {
+        self.min_initial_leverage <= self.max_leverage
+    }
+}
+
 impl Custody {
     pub const LEN: usize = 8 + std::mem::size_of::<Custody>();
 
@@ -138,6 +146,7 @@ impl Custody {
         self.token_account != Pubkey::default()
             && self.mint != Pubkey::default()
             && self.oracle.validate()
+            && self.pricing.validate()
             && self.fees.validate()
     }
 }

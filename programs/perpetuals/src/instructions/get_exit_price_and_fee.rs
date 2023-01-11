@@ -60,7 +60,7 @@ pub struct GetExitPriceAndFee<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct GetExitPriceAndFeeParams {
-    size: u64,
+    size_usd: u64,
 }
 
 pub fn get_exit_price_and_fee(
@@ -68,10 +68,10 @@ pub fn get_exit_price_and_fee(
     params: &GetExitPriceAndFeeParams,
 ) -> Result<PriceAndFee> {
     // validate inputs
-    if params.size == 0 {
+    let position = &ctx.accounts.position;
+    if params.size_usd == 0 || params.size_usd > position.size_usd {
         return Err(ProgramError::InvalidArgument.into());
     }
-    let position = &ctx.accounts.position;
     let pool = &ctx.accounts.pool;
     let token_id = pool.get_token_id(&ctx.accounts.custody.key())?;
 
@@ -85,22 +85,22 @@ pub fn get_exit_price_and_fee(
         custody.oracle.max_price_age_sec,
         curtime,
     )?;
-    let exit_price = pool.get_exit_price(position, &token_price)?;
+    let token_ema_price = OraclePrice::new_from_oracle_ema(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+    let price = pool.get_exit_price(position, &token_price, &token_ema_price, &custody)?;
 
     // compute amount to close
-    let unrealized_pnl = math::checked_add(position.unrealized_pnl, pool.get_pnl(&position)?)?;
-    let available_amount = math::checked_add(position.collateral, unrealized_pnl)?;
-    let close_amount = math::checked_as_u64(math::checked_div(
-        math::checked_mul(available_amount as u128, params.size as u128)?,
-        1000000u128,
-    )?)?;
+    let size = token_price.get_token_amount(params.size_usd, custody.decimals)?;
+    let close_amount =
+        pool.get_close_amount(&position, &token_price, &token_ema_price, &custody, size)?;
 
     // compute fee
-    let fee = pool.get_exit_fee(position, &[&custody])?;
-    let fee_amount = fee.get_fee_amount(close_amount)?;
+    let fee = pool.get_exit_fee(position, close_amount, size, &custody, &token_price)?;
 
-    Ok(PriceAndFee {
-        price: exit_price,
-        fee: fee_amount,
-    })
+    Ok(PriceAndFee { price, fee })
 }

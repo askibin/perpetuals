@@ -20,14 +20,16 @@ pub struct Position {
     pub pool: Pubkey,
     pub token_id: u16,
 
+    pub open_time: i64,
+    pub update_time: i64,
     pub time: i64,
     pub side: Side,
     pub price: u64,
-    pub size: u64,
-    pub collateral: u64,
-    pub interest_debt: u64,
-    pub unrealized_profit: u64,
-    pub unrealized_loss: u64,
+    pub size_usd: u64,
+    pub collateral_usd: u64,
+    pub interest_debt_usd: u64,
+    pub unrealized_profit_usd: u64,
+    pub unrealized_loss_usd: u64,
 
     pub bump: u8,
 }

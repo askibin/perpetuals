@@ -60,7 +60,7 @@ pub struct AddPool<'info> {
         payer = admin,
         mint::authority = transfer_authority,
         mint::freeze_authority = transfer_authority,
-        mint::decimals = Pool::LP_DECIMALS,
+        mint::decimals = Perpetuals::LP_DECIMALS,
         seeds = [b"lp_token_mint",
                  pool.key().as_ref()],
         bump

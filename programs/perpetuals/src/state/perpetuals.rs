@@ -11,9 +11,10 @@ pub struct PriceAndFee {
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
-pub struct AmountAndFee {
-    pub amount: u64,
-    pub fee: u64,
+pub struct SwapAmountAndFees {
+    pub amount_out: u64,
+    pub fee_in: u64,
+    pub fee_out: u64,
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]

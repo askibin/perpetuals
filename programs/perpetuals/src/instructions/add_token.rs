@@ -4,7 +4,7 @@ use {
     crate::{
         error::PerpetualsError,
         state::{
-            custody::{Custody, Fees, OracleParams},
+            custody::{Custody, Fees, OracleParams, PricingParams},
             multisig::{AdminInstruction, Multisig},
             perpetuals::{Permissions, Perpetuals},
             pool::{Pool, PoolToken},
@@ -84,6 +84,7 @@ pub struct AddToken<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct AddTokenParams {
     pub oracle: OracleParams,
+    pub pricing: PricingParams,
     pub permissions: Permissions,
     pub fees: Fees,
     pub target_ratio: u64,
@@ -119,6 +120,7 @@ pub fn add_token<'info>(
     // update pool data
     let pool = ctx.accounts.pool.as_mut();
     if let Ok(idx) = pool.get_token_id(&ctx.accounts.custody.key()) {
+        pool.tokens[idx].custody = ctx.accounts.custody.key();
         pool.tokens[idx].target_ratio = params.target_ratio;
         pool.tokens[idx].min_ratio = params.min_ratio;
         pool.tokens[idx].max_ratio = params.max_ratio;
@@ -137,6 +139,7 @@ pub fn add_token<'info>(
     custody.mint = ctx.accounts.custody_token_mint.key();
     custody.decimals = ctx.accounts.custody_token_mint.decimals;
     custody.oracle = params.oracle;
+    custody.pricing = params.pricing;
     custody.permissions = params.permissions;
     custody.fees = params.fees;
     custody.bump = *ctx.bumps.get("custody").ok_or(ProgramError::InvalidSeeds)?;

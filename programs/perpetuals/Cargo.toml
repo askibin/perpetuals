@@ -10,7 +10,7 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "solana_perpetuals"
+name = "perpetuals"
 
 [features]
 no-entrypoint = []

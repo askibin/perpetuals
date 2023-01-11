@@ -47,7 +47,8 @@ pub struct GetEntryPriceAndFee<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct GetEntryPriceAndFeeParams {
-    size: u64,
+    collateral: u64,
+    size_usd: u64,
     side: Side,
 }
 
@@ -56,7 +57,7 @@ pub fn get_entry_price_and_fee(
     params: &GetEntryPriceAndFeeParams,
 ) -> Result<PriceAndFee> {
     // validate inputs
-    if params.size == 0 || params.side == Side::None {
+    if params.size_usd == 0 || params.side == Side::None {
         return Err(ProgramError::InvalidArgument.into());
     }
     let pool = &ctx.accounts.pool;
@@ -72,14 +73,25 @@ pub fn get_entry_price_and_fee(
         custody.oracle.max_price_age_sec,
         curtime,
     )?;
-    let position_price = pool.get_entry_price(token_id, &token_price, params.side)?;
+    let token_ema_price = OraclePrice::new_from_oracle_ema(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+    let price = pool.get_entry_price(&token_price, &token_ema_price, params.side, &custody)?;
 
     // compute fee
-    let fee = pool.get_entry_fee(0, params.side, params.size, &[&custody])?;
-    let fee_amount = fee.get_fee_amount(params.size)?;
+    let size = token_price.get_token_amount(params.size_usd, custody.decimals)?;
+    let fee = pool.get_entry_fee(
+        0,
+        params.collateral,
+        size,
+        params.side,
+        &custody,
+        &token_price,
+    )?;
 
-    Ok(PriceAndFee {
-        price: position_price,
-        fee: fee_amount,
-    })
+    Ok(PriceAndFee { price, fee })
 }

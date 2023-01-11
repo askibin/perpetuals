@@ -10,7 +10,7 @@ mod state;
 use {
     anchor_lang::prelude::*,
     instructions::*,
-    state::perpetuals::{AmountAndFee, PriceAndFee},
+    state::perpetuals::{PriceAndFee, SwapAmountAndFees},
 };
 
 solana_security_txt::security_txt! {
@@ -159,10 +159,10 @@ pub mod perpetuals {
         instructions::get_liquidation_price(ctx, &params)
     }
 
-    pub fn get_swap_amount_and_fee(
-        ctx: Context<GetSwapAmountAndFee>,
-        params: GetSwapAmountAndFeeParams,
-    ) -> Result<AmountAndFee> {
-        instructions::get_swap_amount_and_fee(ctx, &params)
+    pub fn get_swap_amount_and_fees(
+        ctx: Context<GetSwapAmountAndFees>,
+        params: GetSwapAmountAndFeesParams,
+    ) -> Result<SwapAmountAndFees> {
+        instructions::get_swap_amount_and_fees(ctx, &params)
     }
 }

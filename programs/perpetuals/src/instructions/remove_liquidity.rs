@@ -53,6 +53,7 @@ pub struct RemoveLiquidity<'info> {
     pub pool: Box<Account<'info, Pool>>,
 
     #[account(
+        mut,
         seeds = [b"custody",
                  pool.key().as_ref(),
                  custody.mint.as_ref()],
@@ -129,7 +130,7 @@ pub fn remove_liquidity(
         token_price.get_asset_amount_usd(custody.assets.owned, custody.decimals)? as u128;
     pool_amount_usd = math::checked_add(
         pool_amount_usd,
-        pool.get_assets_under_management(&ctx.remaining_accounts, token_id, curtime)?,
+        pool.get_assets_under_management_usd(&ctx.remaining_accounts, token_id, curtime)?,
     )?;
 
     // compute amount of tokens to return
@@ -140,8 +141,8 @@ pub fn remove_liquidity(
     let remove_amount = token_price.get_token_amount(remove_amount_usd, custody.decimals)?;
 
     // calculate fee
-    let fee = pool.get_remove_liquidity_fee(0, &[&custody])?;
-    let fee_amount = fee.get_fee_amount(remove_amount)?;
+    let fee_amount =
+        pool.get_remove_liquidity_fee(token_id, remove_amount, &custody, &token_price)?;
     msg!("Collected fee: {}", fee_amount);
 
     let no_fee_amount = math::checked_sub(remove_amount, fee_amount)?;
@@ -149,10 +150,10 @@ pub fn remove_liquidity(
 
     // check pool constraints
     msg!("Check pool constraints");
-    let protocol_fee = custody.fees.protocol_share.get_fee_amount(fee_amount)?;
+    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     let withdrawal_amount = math::checked_add(no_fee_amount, protocol_fee)?;
     require!(
-        pool.check_amount_out(token_id, withdrawal_amount)?,
+        pool.check_amount_in_out(token_id, 0, withdrawal_amount, &custody, &token_price)?,
         PerpetualsError::PoolAmountLimit
     );
 
@@ -178,14 +179,14 @@ pub fn remove_liquidity(
 
     // update custody stats
     msg!("Update custody stats");
-    custody.collected_fees.remove_liquidity = custody
+    custody.collected_fees.remove_liquidity_usd = custody
         .collected_fees
-        .remove_liquidity
+        .remove_liquidity_usd
         .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
 
-    custody.volume_stats.remove_liquidity = custody
+    custody.volume_stats.remove_liquidity_usd = custody
         .volume_stats
-        .remove_liquidity
+        .remove_liquidity_usd
         .wrapping_add(remove_amount_usd);
 
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;

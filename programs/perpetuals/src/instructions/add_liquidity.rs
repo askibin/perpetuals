@@ -114,16 +114,23 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     let token_id = pool.get_token_id(&custody.key())?;
 
     // calculate fee
-    let fee = pool.get_add_liquidity_fee(0, &[&custody])?;
-    let fee_amount = fee.get_fee_amount(params.amount)?;
+    let curtime = perpetuals.get_time()?;
+    let token_price = OraclePrice::new_from_oracle(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+    let fee_amount = pool.get_add_liquidity_fee(token_id, params.amount, &custody, &token_price)?;
     msg!("Collected fee: {}", fee_amount);
 
     // check pool constraints
     msg!("Check pool constraints");
-    let protocol_fee = custody.fees.protocol_share.get_fee_amount(fee_amount)?;
+    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     let deposit_amount = math::checked_sub(params.amount, protocol_fee)?;
     require!(
-        pool.check_amount_in(token_id, deposit_amount)?,
+        pool.check_amount_in_out(token_id, deposit_amount, 0, &custody, &token_price)?,
         PerpetualsError::PoolAmountLimit
     );
 
@@ -139,26 +146,18 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
 
     // compute assets under management
     msg!("Compute assets under management");
-    let curtime = perpetuals.get_time()?;
-    let token_price = OraclePrice::new_from_oracle(
-        custody.oracle.oracle_type,
-        &ctx.accounts.custody_oracle_account.to_account_info(),
-        custody.oracle.max_price_error,
-        custody.oracle.max_price_age_sec,
-        curtime,
-    )?;
     let mut pool_amount_usd: u128 =
         token_price.get_asset_amount_usd(custody.assets.owned, custody.decimals)? as u128;
     pool_amount_usd = math::checked_add(
         pool_amount_usd,
-        pool.get_assets_under_management(&ctx.remaining_accounts, token_id, curtime)?,
+        pool.get_assets_under_management_usd(&ctx.remaining_accounts, token_id, curtime)?,
     )?;
 
     // compute amount of lp tokens to mint
     let no_fee_amount = math::checked_sub(params.amount, fee_amount)?;
     require_gte!(
         no_fee_amount,
-        1,
+        1u64,
         PerpetualsError::InsufficientAmountReturned
     );
     let token_amount_usd = token_price.get_asset_amount_usd(no_fee_amount, custody.decimals)?;
@@ -186,14 +185,14 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
 
     // update custody stats
     msg!("Update custody stats");
-    custody.collected_fees.add_liquidity = custody
+    custody.collected_fees.add_liquidity_usd = custody
         .collected_fees
-        .add_liquidity
+        .add_liquidity_usd
         .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
 
-    custody.volume_stats.add_liquidity = custody
+    custody.volume_stats.add_liquidity_usd = custody
         .volume_stats
-        .add_liquidity
+        .add_liquidity_usd
         .wrapping_add(token_price.get_asset_amount_usd(params.amount, custody.decimals)?);
 
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;

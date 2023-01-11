@@ -115,10 +115,10 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     let position = ctx.accounts.position.as_mut();
     let pool = ctx.accounts.pool.as_mut();
     if params.price == 0
-        || (params.collateral == 0 && position.time == 0)
-        || params.size == 0
-        /*|| params.collateral > params.size*/
-        || params.side == Side::None
+            || (params.collateral == 0 && position.time == 0)
+            || params.size == 0
+            /*|| params.collateral > params.size*/
+            || params.side == Side::None
     {
         return Err(ProgramError::InvalidArgument.into());
     }
@@ -133,7 +133,15 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         custody.oracle.max_price_age_sec,
         curtime,
     )?;
-    let position_price = pool.get_entry_price(token_id, &token_price, params.side)?;
+    let token_ema_price = OraclePrice::new_from_oracle_ema(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+    let position_price =
+        pool.get_entry_price(&token_price, &token_ema_price, params.side, &custody)?;
     msg!("Entry price: {}", position_price);
     if params.side == Side::Long {
         require_gte!(
@@ -152,8 +160,14 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     // compute swap fee
 
     // compute fee
-    let fee = pool.get_entry_fee(0, params.side, params.size, &[&custody])?;
-    let fee_amount = fee.get_fee_amount(params.size)?;
+    let fee_amount = pool.get_entry_fee(
+        token_id,
+        params.collateral,
+        params.size,
+        params.side,
+        &custody,
+        &token_price,
+    )?;
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
@@ -163,9 +177,12 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     // check pool constraints
     msg!("Check pool constraints");
     require!(
-        pool.check_amount_in(token_id, transfer_amount)?,
+        pool.check_amount_in_out(token_id, transfer_amount, 0, &custody, &token_price)?,
         PerpetualsError::PoolAmountLimit
     );
+
+    let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
+    let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
 
     if position.time == 0 {
         // init new position
@@ -176,10 +193,11 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         position.time = perpetuals.get_time()?;
         position.side = params.side;
         position.price = position_price;
-        position.size = params.size;
-        position.collateral = params.collateral;
-        position.interest_debt = 0;
-        position.unrealized_pnl = 0;
+        position.size_usd = size_usd;
+        position.collateral_usd = collateral_usd;
+        position.interest_debt_usd = 0;
+        position.unrealized_profit_usd = 0;
+        position.unrealized_loss_usd = 0;
         position.bump = *ctx
             .bumps
             .get("position")
@@ -193,23 +211,32 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         }
 
         // save accumulated interest nad pnl
-        position.interest_debt =
-            math::checked_add(pool.get_interest_amount(position)?, position.interest_debt)?;
-        position.unrealized_pnl =
-            math::checked_add(pool.get_pnl(position)?, position.unrealized_pnl)?;
+        position.interest_debt_usd = math::checked_add(
+            pool.get_interest_amount(position, &custody, curtime)?,
+            position.interest_debt_usd,
+        )?;
+        let (unrealized_profit_usd, unrealized_loss_usd) =
+            pool.get_pnl_usd(position, &token_price, &token_ema_price, &custody)?;
+        position.unrealized_profit_usd =
+            math::checked_add(unrealized_profit_usd, position.unrealized_profit_usd)?;
+        position.unrealized_loss_usd =
+            math::checked_add(unrealized_loss_usd, position.unrealized_loss_usd)?;
 
         position.time = perpetuals.get_time()?;
         position.price = position_price;
-        position.size = math::checked_add(position.size, params.size)?;
-        position.collateral = math::checked_add(position.collateral, params.collateral)?;
+        position.size_usd = math::checked_add(position.size_usd, size_usd)?;
+        position.collateral_usd = math::checked_add(position.collateral_usd, collateral_usd)?;
     }
 
     // check position risk
     msg!("Check position risks");
-    require!(pool.check_leverage(position)?, PerpetualsError::MaxLeverage);
+    require!(
+        pool.check_leverage(position, &token_price, &token_ema_price, &custody, true)?,
+        PerpetualsError::MaxLeverage
+    );
 
     // lock funds for potential profit payoff
-    pool.lock_funds(params.size)?;
+    pool.lock_funds(params.size, custody)?;
 
     // transfer tokens
     msg!("Transfer tokens");
@@ -223,22 +250,21 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
 
     // update custody stats
     msg!("Update custody stats");
-    custody.collected_fees.open_position = math::checked_add(
-        custody.collected_fees.open_position,
+    custody.collected_fees.open_position_usd = math::checked_add(
+        custody.collected_fees.open_position_usd,
         token_price.get_asset_amount_usd(fee_amount, custody.decimals)?,
     )?;
-    custody.volume_stats.open_position = math::checked_add(
-        custody.volume_stats.open_position,
-        token_price.get_asset_amount_usd(params.size, custody.decimals)?,
-    )?;
+    custody.volume_stats.open_position_usd =
+        math::checked_add(custody.volume_stats.open_position_usd, size_usd)?;
 
     //custody.assets.fees = math::checked_add(custody.assets.fees, fee_amount)?;
 
     if params.side == Side::Long {
-        custody.trade_stats.oi_long = math::checked_add(custody.trade_stats.oi_long, params.size)?;
+        custody.trade_stats.oi_long_usd =
+            math::checked_add(custody.trade_stats.oi_long_usd, params.size)?;
     } else {
-        custody.trade_stats.oi_short =
-            math::checked_add(custody.trade_stats.oi_short, params.size)?;
+        custody.trade_stats.oi_short_usd =
+            math::checked_add(custody.trade_stats.oi_short_usd, params.size)?;
     }
 
     Ok(())

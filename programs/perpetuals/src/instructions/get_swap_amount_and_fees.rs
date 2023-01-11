@@ -1,10 +1,10 @@
-//! GetSwapAmountAndFee instruction handler
+//! GetSwapAmountAndFees instruction handler
 
 use {
     crate::state::{
         custody::Custody,
         oracle::OraclePrice,
-        perpetuals::{AmountAndFee, Perpetuals},
+        perpetuals::{Perpetuals, SwapAmountAndFees},
         pool::Pool,
     },
     anchor_lang::prelude::*,
@@ -12,7 +12,7 @@ use {
 };
 
 #[derive(Accounts)]
-pub struct GetSwapAmountAndFee<'info> {
+pub struct GetSwapAmountAndFees<'info> {
     #[account()]
     pub signer: Signer<'info>,
 
@@ -59,14 +59,14 @@ pub struct GetSwapAmountAndFee<'info> {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct GetSwapAmountAndFeeParams {
+pub struct GetSwapAmountAndFeesParams {
     amount_in: u64,
 }
 
-pub fn get_swap_amount_and_fee(
-    ctx: Context<GetSwapAmountAndFee>,
-    params: &GetSwapAmountAndFeeParams,
-) -> Result<AmountAndFee> {
+pub fn get_swap_amount_and_fees(
+    ctx: Context<GetSwapAmountAndFees>,
+    params: &GetSwapAmountAndFeesParams,
+) -> Result<SwapAmountAndFees> {
     // validate inputs
     msg!("Validate inputs");
     if params.amount_in == 0 {
@@ -93,7 +93,25 @@ pub fn get_swap_amount_and_fee(
         receiving_custody.oracle.max_price_age_sec,
         curtime,
     )?;
+    let received_token_ema_price = OraclePrice::new_from_oracle_ema(
+        receiving_custody.oracle.oracle_type,
+        &ctx.accounts
+            .receiving_custody_oracle_account
+            .to_account_info(),
+        receiving_custody.oracle.max_price_error,
+        receiving_custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
     let dispensed_token_price = OraclePrice::new_from_oracle(
+        dispensing_custody.oracle.oracle_type,
+        &ctx.accounts
+            .dispensing_custody_oracle_account
+            .to_account_info(),
+        dispensing_custody.oracle.max_price_error,
+        dispensing_custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+    let dispensed_token_ema_price = OraclePrice::new_from_oracle_ema(
         dispensing_custody.oracle.oracle_type,
         &ctx.accounts
             .dispensing_custody_oracle_account
@@ -106,16 +124,29 @@ pub fn get_swap_amount_and_fee(
         token_id_in,
         token_id_out,
         &received_token_price,
+        &received_token_ema_price,
         &dispensed_token_price,
+        &dispensed_token_ema_price,
+        &receiving_custody,
+        &dispensing_custody,
         params.amount_in,
     )?;
 
     // calculate fee
-    let fee = pool.get_swap_fee(0, 0, &[&dispensing_custody])?;
-    let fee_amount = fee.get_fee_amount(amount_out)?;
+    let fees = pool.get_swap_fees(
+        token_id_in,
+        token_id_out,
+        params.amount_in,
+        amount_out,
+        &receiving_custody,
+        &received_token_price,
+        &dispensing_custody,
+        &dispensed_token_price,
+    )?;
 
-    Ok(AmountAndFee {
-        amount: amount_out,
-        fee: fee_amount,
+    Ok(SwapAmountAndFees {
+        amount_out,
+        fee_in: fees.0,
+        fee_out: fees.1,
     })
 }
