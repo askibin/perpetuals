@@ -1,15 +1,12 @@
 //! GetExitPriceAndFee instruction handler
 
 use {
-    crate::{
-        math,
-        state::{
-            custody::Custody,
-            oracle::OraclePrice,
-            perpetuals::{Perpetuals, PriceAndFee},
-            pool::Pool,
-            position::Position,
-        },
+    crate::state::{
+        custody::Custody,
+        oracle::OraclePrice,
+        perpetuals::{Perpetuals, PriceAndFee},
+        pool::Pool,
+        position::Position,
     },
     anchor_lang::prelude::*,
     solana_program::program_error::ProgramError,

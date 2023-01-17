@@ -121,8 +121,6 @@ pub fn get_swap_amount_and_fees(
         curtime,
     )?;
     let amount_out = pool.get_swap_amount(
-        token_id_in,
-        token_id_out,
         &received_token_price,
         &received_token_ema_price,
         &dispensed_token_price,

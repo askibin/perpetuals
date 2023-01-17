@@ -951,6 +951,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "perpetuals"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "anchor-lang",
+ "anchor-spl",
+ "num",
+ "num-traits",
+ "pyth-sdk-solana",
+ "solana-program",
+ "solana-security-txt",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1332,20 +1346,6 @@ dependencies = [
  "quote",
  "rustc_version",
  "syn",
-]
-
-[[package]]
-name = "solana-perpetuals"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "anchor-lang",
- "anchor-spl",
- "num",
- "num-traits",
- "pyth-sdk-solana",
- "solana-program",
- "solana-security-txt",
 ]
 
 [[package]]

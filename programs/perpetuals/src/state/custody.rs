@@ -1,10 +1,7 @@
 use super::perpetuals::Perpetuals;
 
 use {
-    crate::state::{
-        oracle::{OraclePrice, OracleType},
-        perpetuals::Permissions,
-    },
+    crate::state::{oracle::OracleType, perpetuals::Permissions},
     anchor_lang::prelude::*,
 };
 
@@ -136,6 +133,9 @@ impl OracleParams {
 impl PricingParams {
     pub fn validate(&self) -> bool {
         self.min_initial_leverage <= self.max_leverage
+            && (self.trade_spread_long as u128) < Perpetuals::BPS_POWER
+            && (self.trade_spread_short as u128) < Perpetuals::BPS_POWER
+            && (self.swap_spread as u128) < Perpetuals::BPS_POWER
     }
 }
 

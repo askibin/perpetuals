@@ -1,5 +1,5 @@
 [package]
-name = "solana-perpetuals"
+name = "perpetuals"
 version = "0.1.0"
 description = "Solana Perpetuals Exchange"
 authors = ["Solana Maintainers <maintainers@solana.foundation>"]

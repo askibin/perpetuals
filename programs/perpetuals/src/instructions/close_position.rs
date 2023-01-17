@@ -14,7 +14,6 @@ use {
     },
     anchor_lang::prelude::*,
     anchor_spl::token::{Token, TokenAccount},
-    solana_program::program_error::ProgramError,
 };
 
 #[derive(Accounts)]

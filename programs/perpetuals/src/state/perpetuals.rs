@@ -1,5 +1,4 @@
 use {
-    crate::math,
     anchor_lang::prelude::*,
     anchor_spl::token::{Burn, MintTo, Transfer},
 };

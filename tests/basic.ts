@@ -9,6 +9,7 @@ describe("perpetuals", () => {
   let tc = new TestClient();
   tc.printErrors = true;
   let oracleConfig;
+  let pricing;
   let permissions;
   let fees;
   let ratios;
@@ -111,6 +112,7 @@ describe("perpetuals", () => {
     let poolExpected = {
       name: "test pool",
       tokens: [],
+      aumUsd: new BN(0),
       bump: tc.pool.bump,
       lpTokenBump: pool.lpTokenBump,
       inceptionTime: new BN(0),
@@ -130,6 +132,15 @@ describe("perpetuals", () => {
       oracleType: { test: {} },
       oracleAccount: tc.custodies[0].oracleAccount,
     };
+    pricing = {
+      useEma: true,
+      tradeSpreadLong: new BN(100),
+      tradeSpreadShort: new BN(100),
+      swapSpread: new BN(200),
+      interestPerSec: new BN(30000),
+      minInitialLeverage: new BN(10000),
+      maxLeverage: new BN(1000000),
+    };
     permissions = {
       allowSwap: true,
       allowAddLiquidity: true,
@@ -141,7 +152,7 @@ describe("perpetuals", () => {
       allowSizeChange: true,
     };
     fees = {
-      mode: { test: {} },
+      mode: { linear: {} },
       maxChange: new BN(20000),
       swap: new BN(100),
       addLiquidity: new BN(100),
@@ -149,13 +160,21 @@ describe("perpetuals", () => {
       openPosition: new BN(100),
       closePosition: new BN(100),
       liquidation: new BN(100),
+      protocolShare: new BN(10),
     };
     ratios = {
-      target: new BN(100),
+      target: new BN(5000),
       min: new BN(10),
-      max: new BN(1000),
+      max: new BN(20000),
     };
-    await tc.addToken(tc.custodies[0], oracleConfig, permissions, fees, ratios);
+    await tc.addToken(
+      tc.custodies[0],
+      oracleConfig,
+      pricing,
+      permissions,
+      fees,
+      ratios
+    );
 
     let token = await tc.program.account.custody.fetch(tc.custodies[0].custody);
     tokenExpected = {
@@ -167,6 +186,15 @@ describe("perpetuals", () => {
         oracleType: { test: {} },
         maxPriceError: "10000",
         maxPriceAgeSec: 60,
+      },
+      pricing: {
+        useEma: true,
+        tradeSpreadLong: "100",
+        tradeSpreadShort: "100",
+        swapSpread: "200",
+        interestPerSec: "30000",
+        minInitialLeverage: "10000",
+        maxLeverage: "1000000",
       },
       permissions: {
         allowSwap: true,
@@ -187,25 +215,31 @@ describe("perpetuals", () => {
         openPosition: "100",
         closePosition: "100",
         liquidation: "100",
+        protocolShare: "10",
       },
       assets: { collateral: "0", protocolFees: "0", owned: "0", locked: "0" },
       collectedFees: {
-        swap: "0",
-        addLiquidity: "0",
-        removeLiquidity: "0",
-        openPosition: "0",
-        closePosition: "0",
-        liquidation: "0",
+        swapUsd: "0",
+        addLiquidityUsd: "0",
+        removeLiquidityUsd: "0",
+        openPositionUsd: "0",
+        closePositionUsd: "0",
+        liquidationUsd: "0",
       },
       volumeStats: {
-        swap: "0",
-        addLiquidity: "0",
-        removeLiquidity: "0",
-        openPosition: "0",
-        closePosition: "0",
-        liquidation: "0",
+        swapUsd: "0",
+        addLiquidityUsd: "0",
+        removeLiquidityUsd: "0",
+        openPositionUsd: "0",
+        closePositionUsd: "0",
+        liquidationUsd: "0",
       },
-      tradeStats: { profit: "0", loss: "0", oiLong: "0", oiShort: "0" },
+      tradeStats: {
+        profitUsd: "0",
+        lossUsd: "0",
+        oiLongUsd: "0",
+        oiShortUsd: "0",
+      },
       bump: token.bump,
       tokenAccountBump: token.tokenAccountBump,
     };
@@ -216,6 +250,7 @@ describe("perpetuals", () => {
     await tc.addToken(
       tc.custodies[1],
       oracleConfig2,
+      pricing,
       permissions,
       fees,
       ratios
@@ -224,7 +259,14 @@ describe("perpetuals", () => {
     await tc.removeToken(tc.custodies[0]);
     tc.ensureFails(tc.program.account.custody.fetch(tc.custodies[0].custody));
 
-    await tc.addToken(tc.custodies[0], oracleConfig, permissions, fees, ratios);
+    await tc.addToken(
+      tc.custodies[0],
+      oracleConfig,
+      pricing,
+      permissions,
+      fees,
+      ratios
+    );
   });
 
   it("setTokenConfig", async () => {

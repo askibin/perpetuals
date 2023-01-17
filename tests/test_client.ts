@@ -1,5 +1,4 @@
 import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
 import { Perpetuals } from "../target/types/perpetuals";
 import {
   PublicKey,
@@ -477,7 +476,14 @@ export class TestClient {
     }
   };
 
-  addToken = async (custody, oracleConfig, permissions, fees, ratios) => {
+  addToken = async (
+    custody,
+    oracleConfig,
+    pricing,
+    permissions,
+    fees,
+    ratios
+  ) => {
     let multisig = await this.program.account.multisig.fetch(
       this.multisig.publicKey
     );
@@ -486,6 +492,7 @@ export class TestClient {
         await this.program.methods
           .addToken({
             oracle: oracleConfig,
+            pricing,
             permissions,
             fees,
             targetRatio: ratios.target,

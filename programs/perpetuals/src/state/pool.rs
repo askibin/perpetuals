@@ -1,7 +1,3 @@
-use std::{ops::Add, process::exit};
-
-use anchor_spl::token;
-
 use {
     crate::{
         error::PerpetualsError,
@@ -188,8 +184,6 @@ impl Pool {
 
     pub fn get_swap_amount(
         &self,
-        token_id_in: usize,
-        token_id_out: usize,
         token_in_price: &OraclePrice,
         token_in_ema_price: &OraclePrice,
         token_out_price: &OraclePrice,
@@ -534,16 +528,20 @@ impl Pool {
         custody: &Custody,
         token_price: &OraclePrice,
     ) -> Result<u64> {
-        let new_aum_usd = token_price.get_asset_amount_usd(
+        let token_aum_usd = token_price.get_asset_amount_usd(
             math::checked_sub(
                 math::checked_add(custody.assets.owned, amount_add)?,
                 amount_remove,
             )?,
             custody.decimals,
         )? as u128;
+        let new_aum_usd = math::checked_add(self.aum_usd, token_aum_usd)?;
+        if new_aum_usd == 0 {
+            return Ok(0);
+        }
         math::checked_as_u64(math::checked_div(
-            math::checked_mul(new_aum_usd, Perpetuals::BPS_POWER)?,
-            self.aum_usd,
+            math::checked_mul(token_aum_usd, Perpetuals::BPS_POWER)?,
+            new_aum_usd,
         )?)
     }
 
@@ -580,17 +578,20 @@ impl Pool {
             } else {
                 token_ema_price
             };
+            let spread = math::checked_decimal_mul(
+                min_price.price,
+                min_price.exponent,
+                spread_short,
+                -(Perpetuals::BPS_DECIMALS as i32),
+                min_price.exponent,
+            )?;
+            let price = if spread < min_price.price {
+                math::checked_sub(min_price.price, spread)?
+            } else {
+                0
+            };
             Ok(OraclePrice {
-                price: math::checked_sub(
-                    min_price.price,
-                    math::checked_decimal_mul(
-                        min_price.price,
-                        min_price.exponent,
-                        spread_short,
-                        -(Perpetuals::BPS_DECIMALS as i32),
-                        min_price.exponent,
-                    )?,
-                )?,
+                price,
                 exponent: min_price.exponent,
             })
         }
@@ -610,42 +611,52 @@ impl Pool {
         }
         let token = &self.tokens[token_id];
         let new_ratio = self.get_new_ratio(amount_add, amount_remove, custody, token_price)?;
-        let max_fee_change = math::checked_div(
+        let max_fee_change = math::checked_as_u64(math::checked_div(
             math::checked_mul(
                 math::checked_sub(custody.fees.max_change as u128, Perpetuals::BPS_POWER)?,
                 custody.fees.open_position as u128,
             )?,
             Perpetuals::BPS_POWER,
-        )?;
+        )?)?;
 
-        let fee = if new_ratio >= token.target_ratio {
-            math::checked_add(
-                custody.fees.open_position,
-                math::checked_as_u64(math::checked_ceil_div(
-                    math::checked_mul(
-                        math::checked_sub(
-                            std::cmp::min(token.max_ratio, new_ratio),
-                            token.target_ratio,
-                        )? as u128,
-                        max_fee_change,
-                    )?,
-                    math::checked_sub(token.max_ratio, token.target_ratio)? as u128,
-                )?)?,
-            )?
+        let fee = if new_ratio == token.target_ratio {
+            custody.fees.open_position
+        } else if new_ratio > token.target_ratio {
+            if token.max_ratio <= token.target_ratio {
+                math::checked_add(custody.fees.open_position, max_fee_change)?
+            } else {
+                math::checked_add(
+                    custody.fees.open_position,
+                    math::checked_as_u64(math::checked_ceil_div(
+                        math::checked_mul(
+                            math::checked_sub(
+                                std::cmp::min(token.max_ratio, new_ratio),
+                                token.target_ratio,
+                            )? as u128,
+                            max_fee_change as u128,
+                        )?,
+                        math::checked_sub(token.max_ratio, token.target_ratio)? as u128,
+                    )?)?,
+                )?
+            }
         } else {
-            math::checked_sub(
-                custody.fees.open_position,
-                math::checked_as_u64(math::checked_ceil_div(
-                    math::checked_mul(
-                        math::checked_sub(
-                            token.target_ratio,
-                            std::cmp::max(token.min_ratio, new_ratio),
-                        )? as u128,
-                        max_fee_change,
-                    )?,
-                    math::checked_sub(token.target_ratio, token.min_ratio)? as u128,
-                )?)?,
-            )?
+            if token.max_ratio <= token.target_ratio {
+                math::checked_add(custody.fees.open_position, max_fee_change)?
+            } else {
+                math::checked_sub(
+                    custody.fees.open_position,
+                    math::checked_as_u64(math::checked_ceil_div(
+                        math::checked_mul(
+                            math::checked_sub(
+                                token.target_ratio,
+                                std::cmp::max(token.min_ratio, new_ratio),
+                            )? as u128,
+                            max_fee_change as u128,
+                        )?,
+                        math::checked_sub(token.target_ratio, token.min_ratio)? as u128,
+                    )?)?,
+                )?
+            }
         };
 
         Self::get_fee_amount(fee, std::cmp::max(amount_add, amount_remove))

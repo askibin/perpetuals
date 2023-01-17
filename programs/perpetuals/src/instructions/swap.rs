@@ -170,9 +170,8 @@ pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
         dispensing_custody.oracle.max_price_age_sec,
         curtime,
     )?;
+    msg!("Compute swap amount");
     let amount_out = pool.get_swap_amount(
-        token_id_in,
-        token_id_out,
         &received_token_price,
         &received_token_ema_price,
         &dispensed_token_price,
