@@ -150,23 +150,13 @@ pub fn transfer_sol_from_owned<'a>(
     destination_account: AccountInfo<'a>,
     amount: u64,
 ) -> Result<()> {
-    if amount == 0 {
-        return Ok(());
-    }
 
     **destination_account.try_borrow_mut_lamports()? = destination_account
         .try_lamports()?
         .checked_add(amount)
         .ok_or(ProgramError::InsufficientFunds)?;
     let source_balance = program_owned_source_account.try_lamports()?;
-    if source_balance < amount {
-        msg!(
-            "Error: Not enough funds to withdraw {} lamports from {}",
-            amount,
-            program_owned_source_account.key
-        );
-        return Err(ProgramError::InsufficientFunds.into());
-    }
+
     **program_owned_source_account.try_borrow_mut_lamports()? = source_balance
         .checked_sub(amount)
         .ok_or(ProgramError::InsufficientFunds)?;
@@ -180,14 +170,6 @@ pub fn transfer_sol<'a>(
     system_program: AccountInfo<'a>,
     amount: u64,
 ) -> Result<()> {
-    if source_account.try_lamports()? < amount {
-        msg!(
-            "Error: Not enough funds to withdraw {} lamports from {}",
-            amount,
-            source_account.key
-        );
-        return Err(ProgramError::InsufficientFunds.into());
-    }
 
     let cpi_accounts = anchor_lang::system_program::Transfer {
         from: source_account,
