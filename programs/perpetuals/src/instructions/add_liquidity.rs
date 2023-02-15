@@ -184,6 +184,8 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
 
     // update custody stats
     msg!("Update custody stats");
+    custody.update_borrow_rate(curtime)?;
+
     custody.collected_fees.add_liquidity_usd = custody
         .collected_fees
         .add_liquidity_usd

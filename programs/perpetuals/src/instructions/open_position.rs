@@ -196,7 +196,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     position.collateral_usd = collateral_usd;
     position.unrealized_profit_usd = 0;
     position.unrealized_loss_usd = 0;
-    position.borrow_rate_sum = custody.borrow_rate_sum;
+    position.borrow_rate_sum = custody.borrow_rate_state.rate_sum;
     position.locked_amount = math::checked_as_u64(math::checked_div(
         math::checked_mul(params.size as u128, custody.pricing.max_payoff_mult as u128)?,
         Perpetuals::BPS_POWER,
@@ -240,6 +240,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
 
     // update custody stats
     msg!("Update custody stats");
+    custody.update_borrow_rate(curtime)?;
+
     custody.collected_fees.open_position_usd = custody
         .collected_fees
         .open_position_usd

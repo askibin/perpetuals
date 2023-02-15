@@ -180,6 +180,8 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
 
     // update custody stats
     msg!("Update custody stats");
+    custody.update_borrow_rate(curtime)?;
+
     custody.collected_fees.close_position_usd = custody
         .collected_fees
         .close_position_usd

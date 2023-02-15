@@ -330,8 +330,8 @@ impl Pool {
     }
 
     pub fn get_interest_amount_usd(&self, position: &Position, custody: &Custody) -> Result<u64> {
-        let rate_diff = if custody.borrow_rate_sum > position.borrow_rate_sum {
-            math::checked_sub(custody.borrow_rate_sum, position.borrow_rate_sum)? as u128
+        let rate_diff = if custody.borrow_rate_state.rate_sum > position.borrow_rate_sum {
+            math::checked_sub(custody.borrow_rate_state.rate_sum, position.borrow_rate_sum)? as u128
         } else {
             return Ok(0);
         };

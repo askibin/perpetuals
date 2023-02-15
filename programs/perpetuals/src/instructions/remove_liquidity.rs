@@ -181,6 +181,8 @@ pub fn remove_liquidity(
 
     // update custody stats
     msg!("Update custody stats");
+    custody.update_borrow_rate(curtime)?;
+
     custody.collected_fees.remove_liquidity_usd = custody
         .collected_fees
         .remove_liquidity_usd
