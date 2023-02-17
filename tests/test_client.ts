@@ -1,5 +1,5 @@
-import * as anchor from "@project-serum/anchor";
-import { Perpetuals } from "../target/types/perpetuals";
+import * as anchor from '@project-serum/anchor';
+import { Perpetuals } from '../target/types/perpetuals';
 import {
   PublicKey,
   Keypair,
@@ -11,11 +11,11 @@ import {
   AddressLookupTableProgram,
   TransactionMessage,
   VersionedTransaction,
-} from "@solana/web3.js";
-import * as spl from "@solana/spl-token";
-import { BN } from "bn.js";
+} from '@solana/web3.js';
+import * as spl from '@solana/spl-token';
+import { BN } from 'bn.js';
 
-export type PositionSide = "long" | "short";
+export type PositionSide = 'long' | 'short';
 
 export class TestClient {
   provider: anchor.AnchorProvider;
@@ -77,11 +77,11 @@ export class TestClient {
     }
 
     // pdas
-    this.multisig = this.findProgramAddress("multisig");
-    this.authority = this.findProgramAddress("transfer_authority");
-    this.perpetuals = this.findProgramAddress("perpetuals");
-    this.pool = this.findProgramAddress("pool", "test pool");
-    this.lpToken = this.findProgramAddress("lp_token_mint", [
+    this.multisig = this.findProgramAddress('multisig');
+    this.authority = this.findProgramAddress('transfer_authority');
+    this.perpetuals = this.findProgramAddress('perpetuals');
+    this.pool = this.findProgramAddress('pool', 'test pool');
+    this.lpToken = this.findProgramAddress('lp_token_mint', [
       this.pool.publicKey,
     ]);
 
@@ -153,7 +153,7 @@ export class TestClient {
         );
         tokenAccounts.push(tokenAccount);
 
-        let positionAccount = this.findProgramAddress("position", [
+        let positionAccount = this.findProgramAddress('position', [
           wallet.publicKey,
           this.pool.publicKey,
           custody.custody,
@@ -161,7 +161,7 @@ export class TestClient {
         ]).publicKey;
         positionAccountsLong.push(positionAccount);
 
-        positionAccount = this.findProgramAddress("position", [
+        positionAccount = this.findProgramAddress('position', [
           wallet.publicKey,
           this.pool.publicKey,
           custody.custody,
@@ -205,15 +205,15 @@ export class TestClient {
 
   generateCustody = (decimals: number) => {
     let mint = Keypair.generate();
-    let tokenAccount = this.findProgramAddress("custody_token_account", [
+    let tokenAccount = this.findProgramAddress('custody_token_account', [
       this.pool.publicKey,
       mint.publicKey,
     ]).publicKey;
-    let oracleAccount = this.findProgramAddress("oracle_account", [
+    let oracleAccount = this.findProgramAddress('oracle_account', [
       this.pool.publicKey,
       mint.publicKey,
     ]).publicKey;
-    let custody = this.findProgramAddress("custody", [
+    let custody = this.findProgramAddress('custody', [
       this.pool.publicKey,
       mint.publicKey,
     ]).publicKey;
@@ -230,7 +230,7 @@ export class TestClient {
     let seeds = [Buffer.from(anchor.utils.bytes.utf8.encode(label))];
     if (extraSeeds) {
       for (let extraSeed of extraSeeds) {
-        if (typeof extraSeed === "string") {
+        if (typeof extraSeed === 'string') {
           seeds.push(Buffer.from(anchor.utils.bytes.utf8.encode(extraSeed)));
         } else if (Array.isArray(extraSeed)) {
           seeds.push(Buffer.from(extraSeed));
@@ -252,14 +252,14 @@ export class TestClient {
         lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
         signature: txSignature,
       },
-      { commitment: "processed" }
+      { commitment: 'processed' }
     );
   };
 
   confirmAndLogTx = async (txSignature: anchor.web3.TransactionSignature) => {
     await this.confirmTx(txSignature);
     let tx = await this.provider.connection.getTransaction(txSignature, {
-      commitment: "confirmed",
+      commitment: 'confirmed',
     });
     console.log(tx);
   };
@@ -858,7 +858,7 @@ export class TestClient {
           price: new BN(price * 1000000),
           collateral,
           size,
-          side: side === "long" ? { long: {} } : { short: {} },
+          side: side === 'long' ? { long: {} } : { short: {} },
         })
         .accounts({
           owner: user.wallet.publicKey,
@@ -1026,7 +1026,7 @@ export class TestClient {
       return await this.program.methods
         .getEntryPriceAndFee({
           size,
-          side: side === "long" ? { long: {} } : { short: {} },
+          side: side === 'long' ? { long: {} } : { short: {} },
         })
         .accounts({
           signer: this.provider.wallet.publicKey,

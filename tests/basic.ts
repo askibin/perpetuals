@@ -1,11 +1,11 @@
-import * as anchor from "@project-serum/anchor";
-import { TestClient } from "./test_client";
-import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
-import * as spl from "@solana/spl-token";
-import { expect, assert } from "chai";
-import { BN } from "bn.js";
+import * as anchor from '@project-serum/anchor';
+import { TestClient } from './test_client';
+import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from '@solana/web3.js';
+import * as spl from '@solana/spl-token';
+import { expect, assert } from 'chai';
+import { BN } from 'bn.js';
 
-describe("perpetuals", () => {
+describe('perpetuals', () => {
   let tc = new TestClient();
   tc.printErrors = true;
   let oracleConfig;
@@ -19,12 +19,12 @@ describe("perpetuals", () => {
   let tokenExpected;
   let positionExpected;
 
-  it("init", async () => {
+  it('init', async () => {
     await tc.initFixture();
     await tc.init();
 
     let err = await tc.ensureFails(tc.init());
-    assert(err.logs[3].includes("already in use"));
+    assert(err.logs[3].includes('already in use'));
 
     perpetualsExpected = {
       permissions: {
@@ -75,7 +75,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("setAdminSigners", async () => {
+  it('setAdminSigners', async () => {
     await tc.setAdminSigners(1);
 
     let multisig = await tc.program.account.multisig.fetch(
@@ -85,7 +85,7 @@ describe("perpetuals", () => {
     expect(JSON.stringify(multisig)).to.equal(JSON.stringify(multisigExpected));
   });
 
-  it("setPermissions", async () => {
+  it('setPermissions', async () => {
     perpetualsExpected.permissions = {
       allowSwap: true,
       allowAddLiquidity: true,
@@ -106,12 +106,12 @@ describe("perpetuals", () => {
     );
   });
 
-  it("addAndRemovePool", async () => {
-    await tc.addPool("test pool");
+  it('addAndRemovePool', async () => {
+    await tc.addPool('test pool');
 
     let pool = await tc.program.account.pool.fetch(tc.pool.publicKey);
     let poolExpected = {
-      name: "test pool",
+      name: 'test pool',
       tokens: [],
       aumUsd: new BN(0),
       bump: tc.pool.bump,
@@ -123,10 +123,10 @@ describe("perpetuals", () => {
     await tc.removePool();
     tc.ensureFails(tc.program.account.pool.fetch(tc.pool.publicKey));
 
-    await tc.addPool("test pool");
+    await tc.addPool('test pool');
   });
 
-  it("addAndRemoveCustody", async () => {
+  it('addAndRemoveCustody', async () => {
     oracleConfig = {
       maxPriceError: new BN(10000),
       maxPriceAgeSec: 60,
@@ -190,17 +190,17 @@ describe("perpetuals", () => {
       oracle: {
         oracleAccount: tc.custodies[0].oracleAccount,
         oracleType: { test: {} },
-        maxPriceError: "10000",
+        maxPriceError: '10000',
         maxPriceAgeSec: 60,
       },
       pricing: {
         useEma: true,
-        tradeSpreadLong: "100",
-        tradeSpreadShort: "100",
-        swapSpread: "200",
-        minInitialLeverage: "10000",
-        maxLeverage: "1000000",
-        maxPayoffMult: "10000",
+        tradeSpreadLong: '100',
+        tradeSpreadShort: '100',
+        swapSpread: '200',
+        minInitialLeverage: '10000',
+        maxLeverage: '1000000',
+        maxPayoffMult: '10000',
       },
       permissions: {
         allowSwap: true,
@@ -214,45 +214,45 @@ describe("perpetuals", () => {
       },
       fees: {
         mode: { linear: {} },
-        maxIncrease: "20000",
-        maxDecrease: "5000",
-        swap: "100",
-        addLiquidity: "100",
-        removeLiquidity: "100",
-        openPosition: "100",
-        closePosition: "100",
-        liquidation: "100",
-        protocolShare: "10",
+        maxIncrease: '20000',
+        maxDecrease: '5000',
+        swap: '100',
+        addLiquidity: '100',
+        removeLiquidity: '100',
+        openPosition: '100',
+        closePosition: '100',
+        liquidation: '100',
+        protocolShare: '10',
       },
-      borrowRate: "0",
-      borrowRateSum: "0",
+      borrowRate: '0',
+      borrowRateSum: '0',
       assets: {
-        collateral: "0",
-        protocolFees: "0",
-        owned: "0",
-        locked: "0",
+        collateral: '0',
+        protocolFees: '0',
+        owned: '0',
+        locked: '0',
       },
       collectedFees: {
-        swapUsd: "0",
-        addLiquidityUsd: "0",
-        removeLiquidityUsd: "0",
-        openPositionUsd: "0",
-        closePositionUsd: "0",
-        liquidationUsd: "0",
+        swapUsd: '0',
+        addLiquidityUsd: '0',
+        removeLiquidityUsd: '0',
+        openPositionUsd: '0',
+        closePositionUsd: '0',
+        liquidationUsd: '0',
       },
       volumeStats: {
-        swapUsd: "0",
-        addLiquidityUsd: "0",
-        removeLiquidityUsd: "0",
-        openPositionUsd: "0",
-        closePositionUsd: "0",
-        liquidationUsd: "0",
+        swapUsd: '0',
+        addLiquidityUsd: '0',
+        removeLiquidityUsd: '0',
+        openPositionUsd: '0',
+        closePositionUsd: '0',
+        liquidationUsd: '0',
       },
       tradeStats: {
-        profitUsd: "0",
-        lossUsd: "0",
-        oiLongUsd: "0",
-        oiShortUsd: "0",
+        profitUsd: '0',
+        lossUsd: '0',
+        oiLongUsd: '0',
+        oiShortUsd: '0',
       },
       bump: token.bump,
       tokenAccountBump: token.tokenAccountBump,
@@ -285,7 +285,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("setCustodyConfig", async () => {
+  it('setCustodyConfig', async () => {
     oracleConfig.maxPriceAgeSec = 90;
     permissions.allowPnlWithdrawal = false;
     fees.liquidation = new BN(200);
@@ -303,20 +303,20 @@ describe("perpetuals", () => {
     let token = await tc.program.account.custody.fetch(tc.custodies[0].custody);
     tokenExpected.oracle.maxPriceAgeSec = 90;
     tokenExpected.permissions.allowPnlWithdrawal = false;
-    tokenExpected.fees.liquidation = "200";
+    tokenExpected.fees.liquidation = '200';
     expect(JSON.stringify(token)).to.equal(JSON.stringify(tokenExpected));
   });
 
-  it("setBorrowRate", async () => {
+  it('setBorrowRate', async () => {
     await tc.setBorrowRate(tc.custodies[0], new BN(200), new BN(5000000));
 
     let token = await tc.program.account.custody.fetch(tc.custodies[0].custody);
-    tokenExpected.borrowRate = "200";
-    tokenExpected.borrowRateSum = "5000000";
+    tokenExpected.borrowRate = '200';
+    tokenExpected.borrowRateSum = '5000000';
     expect(JSON.stringify(token)).to.equal(JSON.stringify(tokenExpected));
   });
 
-  it("setTestOraclePrice", async () => {
+  it('setTestOraclePrice', async () => {
     await tc.setTestOraclePrice(123, tc.custodies[0]);
     await tc.setTestOraclePrice(200, tc.custodies[1]);
 
@@ -332,7 +332,7 @@ describe("perpetuals", () => {
     expect(JSON.stringify(oracle)).to.equal(JSON.stringify(oracleExpected));
   });
 
-  it("setTestTime", async () => {
+  it('setTestTime', async () => {
     await tc.setTestTime(111);
 
     let perpetuals = await tc.program.account.perpetuals.fetch(
@@ -343,7 +343,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("addLiquidity", async () => {
+  it('addLiquidity', async () => {
     await tc.addLiquidity(
       tc.toTokenAmount(10, tc.custodies[0].decimals),
       tc.users[0],
@@ -358,7 +358,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("swap", async () => {
+  it('swap', async () => {
     await tc.swap(
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       new BN(1),
@@ -370,7 +370,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("removeLiquidity", async () => {
+  it('removeLiquidity', async () => {
     await tc.removeLiquidity(
       tc.toTokenAmount(1, 6),
       tc.users[0],
@@ -385,12 +385,12 @@ describe("perpetuals", () => {
     );
   });
 
-  it("openPosition", async () => {
+  it('openPosition', async () => {
     await tc.openPosition(
       125,
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.toTokenAmount(7, tc.custodies[0].decimals),
-      "long",
+      'long',
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
@@ -404,24 +404,24 @@ describe("perpetuals", () => {
       owner: tc.users[0].wallet.publicKey.toBase58(),
       pool: tc.pool.publicKey.toBase58(),
       custody: tc.custodies[0].custody.toBase58(),
-      openTime: "111",
-      updateTime: "0",
+      openTime: '111',
+      updateTime: '0',
       side: { long: {} },
-      price: "124230000",
-      sizeUsd: "861000000",
-      collateralUsd: "123000000",
-      unrealizedProfitUsd: "0",
-      unrealizedLossUsd: "0",
-      borrowRateSum: "5000000",
-      lockedAmount: "7000000000",
-      collateralAmount: "1000000000",
+      price: '124230000',
+      sizeUsd: '861000000',
+      collateralUsd: '123000000',
+      unrealizedProfitUsd: '0',
+      unrealizedLossUsd: '0',
+      borrowRateSum: '5000000',
+      lockedAmount: '7000000000',
+      collateralAmount: '1000000000',
       bump: position.bump,
     };
 
     expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
-  it("addCollateral", async () => {
+  it('addCollateral', async () => {
     await tc.addCollateral(
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.users[0],
@@ -431,7 +431,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("removeCollateral", async () => {
+  it('removeCollateral', async () => {
     await tc.removeCollateral(
       tc.toTokenAmount(1, 6),
       tc.users[0],
@@ -441,7 +441,7 @@ describe("perpetuals", () => {
     );
   });
 
-  it("closePosition", async () => {
+  it('closePosition', async () => {
     await tc.closePosition(
       1,
       tc.users[0],
@@ -454,12 +454,12 @@ describe("perpetuals", () => {
     );
   });
 
-  it("liquidate", async () => {
+  it('liquidate', async () => {
     await tc.openPosition(
       125,
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.toTokenAmount(7, tc.custodies[0].decimals),
-      "long",
+      'long',
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
