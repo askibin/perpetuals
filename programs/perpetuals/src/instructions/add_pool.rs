@@ -77,6 +77,9 @@ pub struct AddPoolParams {
     pub name: String,
 }
 
+/// add_pool
+///
+/// A pool can be added by the multisig
 pub fn add_pool<'info>(
     ctx: Context<'_, '_, '_, 'info, AddPool<'info>>,
     params: &AddPoolParams,

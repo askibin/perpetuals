@@ -92,6 +92,12 @@ pub struct AddCollateralParams {
     collateral: u64,
 }
 
+/// add_collateral
+///
+/// Allows a trader to add collateral to an existing position
+/// The trader will also have to pay a dynamic fee
+/// The trader will not be able to post collateral if the leverage is outside [min_leverage,max_leverage]
+///
 pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams) -> Result<()> {
     // validate inputs
     msg!("Validate inputs");
@@ -107,6 +113,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     // compute position price
     let curtime = perpetuals.get_time()?;
 
+    // Get current token price
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
         &ctx.accounts.custody_oracle_account.to_account_info(),
@@ -115,6 +122,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
         curtime,
     )?;
 
+    // Get token price over a period of time
     let token_ema_price = OraclePrice::new_from_oracle_ema(
         custody.oracle.oracle_type,
         &ctx.accounts.custody_oracle_account.to_account_info(),
@@ -123,20 +131,23 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
         curtime,
     )?;
 
-    // compute fee
+    // compute dynamic fee
     let fee_amount =
         pool.get_add_liquidity_fee(token_id, params.collateral, custody, &token_price)?;
     msg!("Collected fee: {}", fee_amount);
 
-    // compute amount to transfer
+    // compute amount to transfer = collateral + fee
     let transfer_amount = math::checked_add(params.collateral, fee_amount)?;
+    // convert the collateral to USD
     let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
     msg!("Amount in: {}", transfer_amount);
     msg!("Collateral added in USD: {}", collateral_usd);
 
     // check pool constraints
     msg!("Check pool constraints");
+    // Take protocol fee from the dynamic fee_amount
     let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
+    // Subract the protocol fee from the deposit amount
     let deposit_amount = math::checked_sub(transfer_amount, protocol_fee)?;
     require!(
         pool.check_token_ratio(token_id, deposit_amount, 0, custody, &token_price)?,
@@ -146,10 +157,12 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     // update existing position
     msg!("Update existing position");
     position.update_time = perpetuals.get_time()?;
+    // Update position collateral
     position.collateral_usd = math::checked_add(position.collateral_usd, collateral_usd)?;
     position.collateral_amount = math::checked_add(position.collateral_amount, params.collateral)?;
 
-    // check position risk
+    // check position risk - don't allow users to post collateral when their leverage
+    // is outside the range [min_leverage,max_leverage]
     msg!("Check position risks");
     require!(
         pool.check_leverage(
@@ -160,7 +173,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
             custody,
             false
         )?,
-        PerpetualsError::MaxLeverage
+        PerpetualsError::MaxLeverage // or min_leverage
     );
 
     // transfer tokens
@@ -181,6 +194,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
         .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
 
     custody.assets.collateral = math::checked_add(custody.assets.collateral, params.collateral)?;
+    // update protocol fees - i.e. protocol fees are a part of the pool
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     Ok(())

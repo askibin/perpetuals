@@ -71,6 +71,10 @@ pub struct InitParams {
     pub allow_size_change: bool,
 }
 
+/// init
+///
+/// initialize multisig for the program and the main state with the required
+/// params
 pub fn init(ctx: Context<Init>, params: &InitParams) -> Result<()> {
     // initialize multisig, this will fail if account is already initialized
     let mut multisig = ctx.accounts.multisig.load_init()?;

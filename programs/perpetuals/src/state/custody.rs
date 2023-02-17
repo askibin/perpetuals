@@ -21,6 +21,7 @@ pub struct Fees {
     pub swap: u64,
     pub add_liquidity: u64,
     pub remove_liquidity: u64,
+    // fee for opening a new position
     pub open_position: u64,
     pub close_position: u64,
     pub liquidation: u64,
@@ -82,6 +83,7 @@ pub struct PricingParams {
     // pricing params have implied BPS_DECIMALS decimals
     pub trade_spread_long: u64,
     pub trade_spread_short: u64,
+    // initial swap spread
     pub swap_spread: u64,
     pub min_initial_leverage: u64,
     pub max_leverage: u64,
@@ -97,7 +99,7 @@ pub struct Custody {
     pub token_account: Pubkey,
     pub decimals: u8,
     pub is_stable: bool,
-    pub oracle: OracleParams,
+    pub oracle: OracleParams, // oracle params for the given token
     pub pricing: PricingParams,
     pub permissions: Permissions,
     pub fees: Fees,

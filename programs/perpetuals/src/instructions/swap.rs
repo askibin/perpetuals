@@ -109,6 +109,9 @@ pub struct SwapParams {
     min_amount_out: u64,
 }
 
+/// swap instruction
+///
+/// Allows users to swap amount into a custody
 pub fn swap(ctx: Context<Swap>, params: &SwapParams) -> Result<()> {
     // check permissions
     msg!("Check permissions");

@@ -135,6 +135,7 @@ pub fn remove_collateral(
     )?;
 
     // compute fee
+    // calculate the collateral in spl token
     let collateral = token_price.get_token_amount(params.collateral_usd, custody.decimals)?;
     let fee_amount = pool.get_remove_liquidity_fee(token_id, collateral, custody, &token_price)?;
     msg!("Collected fee: {}", fee_amount);
