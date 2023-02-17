@@ -629,6 +629,10 @@ impl Pool {
         }
     }
 
+    /// lock_funds
+    ///
+    /// updates the locked amount in the custody
+    /// It's not possible to lock more tokens that is available in the custody
     pub fn lock_funds(&self, amount: u64, custody: &mut Custody) -> Result<()> {
         custody.assets.locked = math::checked_add(custody.assets.locked, amount)?;
 
