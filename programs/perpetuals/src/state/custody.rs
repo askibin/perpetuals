@@ -1,3 +1,10 @@
+use std::ops::{Div, Mul, Shr};
+
+use crate::{
+    math::{self, checked_as_u64, checked_div, checked_mul, checked_pow},
+    state::perpetuals,
+};
+
 use {
     crate::state::{
         oracle::OracleType,
@@ -178,8 +185,78 @@ impl Custody {
             && self.pricing.validate()
             && self.fees.validate()
     }
+
+    /// borrow rate should be a piecewise linear function of
+    /// the utilized liquidity
+    pub fn calculate_borrow_rate(&self, liquidity_borrowed: u64, total_assets: u64) -> Result<u64> {
+        let optimal_util_rate = 800000000;
+        let r_slope = 800000;
+        let r_slope_2 = 1200000;
+        let r_0 = 0;
+        let liquidity_borrowed_scaled = checked_mul(
+            liquidity_borrowed as u128,
+            perpetuals::Perpetuals::RATE_POWER,
+        )
+        .unwrap();
+
+        let util_rate =
+            checked_as_u64(checked_div(liquidity_borrowed_scaled, total_assets as u128).unwrap())
+                .unwrap();
+        println!("util rate: {}", util_rate);
+        if util_rate < optimal_util_rate {
+            return Ok(r_0
+                + checked_div(checked_mul(util_rate, r_slope).unwrap(), optimal_util_rate)
+                    .unwrap());
+        } else {
+            let inve =
+                checked_as_u64(Perpetuals::RATE_POWER - (optimal_util_rate as u128)).unwrap();
+            return Ok(r_0
+                + r_slope_2
+                + checked_div(
+                    checked_mul(util_rate - optimal_util_rate, r_slope_2).unwrap(),
+                    inve,
+                )
+                .unwrap());
+        }
+    }
 }
 
 impl DeprecatedCustody {
     pub const LEN: usize = 8 + std::mem::size_of::<DeprecatedCustody>();
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_calculate_borrow_rate() {
+        let custody = Custody{
+            pub pool: Pubkey,
+            pub mint: Pubkey,
+            pub token_account: Pubkey,
+            pub decimals: u8,
+            pub is_stable: bool,
+            pub oracle: OracleParams,
+            pub pricing: PricingParams,
+            pub permissions: Permissions,
+            pub fees: Fees,
+            // borrow rates have implied RATE_DECIMALS decimals
+            pub borrow_rate: u64,
+            pub borrow_rate_sum: u64,
+        
+            pub assets: Assets,
+            pub collected_fees: FeesStats,
+            pub volume_stats: VolumeStats,
+            pub trade_stats: TradeStats,
+        
+            pub bump: u8,
+            pub token_account_bump: u8,
+        }
+        let liq = 0;
+        let total_assets = 10_000;
+        // borrow rate given in power of RATE_DECIMALS
+        let borrow_rate = calculate_borrow_rate(liq, total_assets).unwrap();
+        println!("borrow rate: {}", borrow_rate);
+    }
 }

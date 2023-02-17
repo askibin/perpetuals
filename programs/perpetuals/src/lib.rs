@@ -75,6 +75,9 @@ pub mod perpetuals {
         instructions::set_custody_config(ctx, &params)
     }
 
+
+    /// Allow borrowing rate to be dynamic based on utilization 
+    /// of pool
     pub fn set_borrow_rate<'info>(
         ctx: Context<'_, '_, '_, 'info, SetBorrowRate<'info>>,
         params: SetBorrowRateParams,
@@ -104,7 +107,6 @@ pub mod perpetuals {
     }
 
     // test instructions
-
     pub fn test_init(ctx: Context<TestInit>, params: TestInitParams) -> Result<()> {
         instructions::test_init(ctx, &params)
     }

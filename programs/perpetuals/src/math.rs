@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+use std::ops::Div;
 use {crate::error::PerpetualsError, anchor_lang::prelude::*, std::fmt::Display};
 
 pub fn checked_add<T>(arg1: T, arg2: T) -> Result<T>
@@ -374,4 +375,17 @@ pub fn to_token_amount(ui_amount: f64, decimals: u8) -> Result<u64> {
         ui_amount,
         checked_powi(10.0, decimals as i32)?,
     )?)
+}
+
+#[cfg(test)]
+mod test {
+    use std::ops::{Mul, Shr};
+
+    use super::*;
+
+    #[test]
+    fn test_multiply_decimal() {
+        let num = checked_decimal_ceil_mul(8, -1, 3000, 0, 0).unwrap();
+        assert_eq!(num, 2400);
+    }
 }

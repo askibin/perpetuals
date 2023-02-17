@@ -322,6 +322,8 @@ impl Pool {
             return Ok(0);
         };
 
+        // NOTE: borrow rate is x*10^9
+        // if borrow rate is 0.008% -> 0.00008*10^9 =80,000
         math::checked_as_u64(math::checked_div(
             math::checked_mul(rate_diff, position.size_usd as u128)?,
             Perpetuals::RATE_POWER,
