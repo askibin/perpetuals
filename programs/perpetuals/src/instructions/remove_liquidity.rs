@@ -128,6 +128,7 @@ pub fn remove_liquidity(
         curtime,
     )?;
 
+    // calculate the pool amount in USD on the fly
     let pool_amount_usd = pool.get_assets_under_management_usd(ctx.remaining_accounts, curtime)?;
 
     // compute amount of tokens to return

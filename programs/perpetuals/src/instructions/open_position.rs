@@ -100,6 +100,9 @@ pub struct OpenPositionParams {
     side: Side,
 }
 
+/// open_position
+///
+/// Allows a trader to open a long/short position with a specific size
 pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) -> Result<()> {
     // check permissions
     msg!("Check permissions");
@@ -144,6 +147,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     msg!("Entry price: {}", position_price);
 
     if params.side == Side::Long {
+        // require the posted price is at least as large as the position price
         require_gte!(
             params.price,
             position_price,
@@ -157,7 +161,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         );
     }
 
-    // compute fee
+    // compute entry fee as collateral_fee+size_fee
     let fee_amount = pool.get_entry_fee(
         token_id,
         params.collateral,
@@ -182,6 +186,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
 
     // init new position
     msg!("Initialize new position");
+    // calculate size in usd
     let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
     let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
 

@@ -34,6 +34,11 @@ pub struct Permissions {
     pub allow_size_change: bool,
 }
 
+/// Perpetuals is the main state
+/// It keeps track of
+/// * the global permissions
+/// * pools by pubkey
+/// * creation of program
 #[account]
 #[derive(Default, Debug)]
 pub struct Perpetuals {
