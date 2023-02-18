@@ -2,8 +2,8 @@
 
 #![allow(clippy::result_large_err)]
 
-mod error;
-mod instructions;
+pub mod error;
+pub mod instructions;
 mod math;
 mod state;
 
