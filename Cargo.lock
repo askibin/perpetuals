@@ -2503,6 +2503,7 @@ dependencies = [
  "ahash",
  "anchor-lang",
  "anchor-spl",
+ "bincode",
  "bonfida-test-utils",
  "num 0.4.0",
  "num-traits",

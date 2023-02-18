@@ -5,7 +5,7 @@
 pub mod error;
 pub mod instructions;
 mod math;
-mod state;
+pub mod state;
 
 use {
     anchor_lang::prelude::*,
