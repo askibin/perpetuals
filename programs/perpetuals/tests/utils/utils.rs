@@ -100,3 +100,20 @@ pub async fn add_perpetuals_program(program_test: &mut ProgramTest, upgrade_auth
     program_test.add_account(perpetuals::id(), program_account);
     program_test.add_account(program_data_pda, program_data_account);
 }
+
+pub async fn create_and_fund_multiple_accounts(
+    program_test: &mut ProgramTest,
+    number: usize,
+) -> Vec<Keypair> {
+    let mut keypairs = Vec::new();
+
+    for _ in 0..number {
+        keypairs.push(Keypair::new());
+    }
+
+    keypairs
+        .iter()
+        .for_each(|k| create_and_fund_account(&k.pubkey(), program_test));
+
+    keypairs
+}

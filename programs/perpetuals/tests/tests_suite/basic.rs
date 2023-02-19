@@ -8,13 +8,15 @@ use perpetuals::{
     },
 };
 use solana_program_test::ProgramTest;
-use solana_sdk::signer::{keypair::Keypair, Signer};
-
+use solana_sdk::signer::Signer;
 use crate::{
     instructions::{
         test_add_custody, test_add_pool, test_init::test_init, test_set_test_oracle_price,
     },
-    utils::{self, add_perpetuals_program, get_current_unix_timestamp, get_test_oracle_account},
+    utils::{
+        add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
+        get_test_oracle_account,
+    },
 };
 
 const ROOT_AUTHORITY: usize = 0;
@@ -29,26 +31,11 @@ const _BTC: usize = 1;
 
 pub async fn basic_test_suite() {
     // ======================================================================
-    // ====> Test Setup
+    // ====> Setup
     // ======================================================================
     let mut program_test = ProgramTest::default();
 
-    let keypairs = {
-        let keypairs = [
-            Keypair::new(),
-            Keypair::new(),
-            Keypair::new(),
-            Keypair::new(),
-            Keypair::new(),
-            Keypair::new(),
-        ];
-
-        keypairs
-            .iter()
-            .for_each(|k| utils::create_and_fund_account(&k.pubkey(), &mut program_test));
-
-        keypairs
-    };
+    let keypairs = create_and_fund_multiple_accounts(&mut program_test, 6).await;
 
     let (mints, mints_key) = {
         let (usdc_mint_key, usdc_mint) =
@@ -65,7 +52,7 @@ pub async fn basic_test_suite() {
     let mut program_test_ctx = program_test.start_with_context().await;
 
     // ======================================================================
-    // ====> Test Run
+    // ====> Run
     // ======================================================================
     let upgrade_authority = &keypairs[PERPETUALS_UPGRADE_AUTHORITY];
 
@@ -103,7 +90,7 @@ pub async fn basic_test_suite() {
         &mut program_test_ctx,
         pool_admin,
         &keypairs[PAYER],
-        "POOL A",
+        "FOO POOL",
         multisig_signers,
     )
     .await;
@@ -117,16 +104,16 @@ pub async fn basic_test_suite() {
             oracle: OracleParams {
                 oracle_account: usdc_test_oracle_pda,
                 oracle_type: OracleType::Test,
-                max_price_error: 1_000_000, // TO THINK ABOUT
-                max_price_age_sec: 30,      // TO THINK ABOUT
+                max_price_error: 1_000_000,
+                max_price_age_sec: 30,
             },
             pricing: PricingParams {
-                use_ema: false,               // TO THINK ABOUT
-                trade_spread_long: 100,       // TO THINK ABOUT
-                trade_spread_short: 100,      // TO THINK ABOUT
-                swap_spread: 200,             // TO THINK ABOUT
-                min_initial_leverage: 10_000, // TO THINK ABOUT
-                max_leverage: 1_000_000,      // TO THINK ABOUT
+                use_ema: false,
+                trade_spread_long: 100,
+                trade_spread_short: 100,
+                swap_spread: 200,
+                min_initial_leverage: 10_000,
+                max_leverage: 1_000_000,
             },
             permissions: Permissions {
                 allow_swap: true,
@@ -140,19 +127,19 @@ pub async fn basic_test_suite() {
             },
             fees: Fees {
                 mode: FeesMode::Linear,
-                max_increase: 20_000,  // TO THINK ABOUT
-                max_decrease: 5_000,   // TO THINK ABOUT
-                swap: 100,             // TO THINK ABOUT
-                add_liquidity: 100,    // TO THINK ABOUT
-                remove_liquidity: 100, // TO THINK ABOUT
-                open_position: 100,    // TO THINK ABOUT
-                close_position: 100,   // TO THINK ABOUT
-                liquidation: 100,      // TO THINK ABOUT
-                protocol_share: 10,    // TO THINK ABOUT
+                max_increase: 20_000,
+                max_decrease: 5_000,
+                swap: 100,
+                add_liquidity: 100,
+                remove_liquidity: 100,
+                open_position: 100,
+                close_position: 100,
+                liquidation: 100,
+                protocol_share: 10,
             },
             target_ratio: 50,
-            min_ratio: 25, // TO THINK ABOUT
-            max_ratio: 75, // TO THINK ABOUT
+            min_ratio: 25,
+            max_ratio: 75,
         };
 
         let usdc_custody_pda = test_add_custody(
