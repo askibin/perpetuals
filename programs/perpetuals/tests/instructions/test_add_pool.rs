@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{pda, utils::get_account};
+use crate::utils::{get_account, pda};
 use anchor_lang::{prelude::AccountMeta, InstructionData, ToAccountMetas};
 use perpetuals::{
     instructions::AddPoolParams,
@@ -96,7 +96,10 @@ pub async fn test_add_pool(
     let perpetuals_account = get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
 
     assert_eq!(*perpetuals_account.pools.last().unwrap(), pool_pda);
-    assert_eq!(perpetuals_account.inception_time, pool_account.inception_time);
+    assert_eq!(
+        perpetuals_account.inception_time,
+        pool_account.inception_time
+    );
 
     (pool_pda, pool_bump, lp_token_mint_pda, lp_token_bump)
 }

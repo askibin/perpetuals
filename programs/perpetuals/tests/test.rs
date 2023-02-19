@@ -3,7 +3,6 @@ use solana_program_test::tokio;
 use crate::tests_suite::basic_test_suite;
 
 pub mod instructions;
-pub mod pda;
 pub mod tests_suite;
 pub mod utils;
 
