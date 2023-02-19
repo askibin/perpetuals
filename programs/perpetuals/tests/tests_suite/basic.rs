@@ -1,33 +1,41 @@
-use bonfida_test_utils::ProgramTestExt;
+use crate::{
+    instructions::{
+        test_add_custody, test_add_liquidity, test_add_pool, test_init::test_init,
+        test_set_test_oracle_price,
+    },
+    utils::{
+        add_perpetuals_program, create_and_fund_multiple_accounts, find_associated_token_account,
+        get_account, get_current_unix_timestamp, get_test_oracle_account,
+    },
+};
+use anchor_lang::prelude::{AccountMeta, Pubkey};
+use anchor_spl::token::{spl_token, Mint};
+use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
-    instructions::{AddCustodyParams, InitParams, SetTestOraclePriceParams},
+    instructions::{AddCustodyParams, AddLiquidityParams, InitParams, SetTestOraclePriceParams},
     state::{
         custody::{Fees, FeesMode, OracleParams, PricingParams},
         oracle::OracleType,
         perpetuals::Permissions,
     },
 };
+use solana_program::{instruction::Instruction, sysvar};
 use solana_program_test::ProgramTest;
-use solana_sdk::signer::Signer;
-use crate::{
-    instructions::{
-        test_add_custody, test_add_pool, test_init::test_init, test_set_test_oracle_price,
-    },
-    utils::{
-        add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
-        get_test_oracle_account,
-    },
-};
+use solana_sdk::signer::{keypair::Keypair, Signer};
 
+// =============================================
+// ===> Keypair details
+// =============================================
 const ROOT_AUTHORITY: usize = 0;
 const PERPETUALS_UPGRADE_AUTHORITY: usize = 1;
 const MULTISIG_MEMBER_A: usize = 2;
 const MULTISIG_MEMBER_B: usize = 3;
 const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
-
-const USDC: usize = 0;
-const _BTC: usize = 1;
+const USER_ALICE: usize = 6;
+// ==============================================
+const NB_KEYPAIR: usize = 7;
+// ==============================================
 
 pub async fn basic_test_suite() {
     // ======================================================================
@@ -35,20 +43,18 @@ pub async fn basic_test_suite() {
     // ======================================================================
     let mut program_test = ProgramTest::default();
 
-    let keypairs = create_and_fund_multiple_accounts(&mut program_test, 6).await;
+    // Initialize the accounts that will be used during the test suite
+    let keypairs = create_and_fund_multiple_accounts(&mut program_test, NB_KEYPAIR).await;
 
-    let (mints, mints_key) = {
-        let (usdc_mint_key, usdc_mint) =
-            program_test.add_mint(None, 6, &keypairs[ROOT_AUTHORITY].pubkey());
-        let (btc_mint_key, btc_mint) =
-            program_test.add_mint(None, 9, &keypairs[ROOT_AUTHORITY].pubkey());
-
-        ([usdc_mint, btc_mint], [usdc_mint_key, btc_mint_key])
-    };
+    // Initialize the mints
+    let usdc_mint = program_test
+        .add_mint(None, 6, &keypairs[ROOT_AUTHORITY].pubkey())
+        .0;
 
     // Deploy the perpetuals program onchain as upgradeable program
     add_perpetuals_program(&mut program_test, &keypairs[PERPETUALS_UPGRADE_AUTHORITY]).await;
 
+    // Start the client and connect to localnet validator
     let mut program_test_ctx = program_test.start_with_context().await;
 
     // ======================================================================
@@ -96,7 +102,7 @@ pub async fn basic_test_suite() {
     .await;
 
     // Get USDC test oracle address
-    let usdc_test_oracle_pda = get_test_oracle_account(&pool_pda, &mints_key[USDC]).0;
+    let usdc_test_oracle_pda = get_test_oracle_account(&pool_pda, &usdc_mint).0;
 
     let usdc_custody_pda = {
         let add_custody_params = AddCustodyParams {
@@ -147,8 +153,8 @@ pub async fn basic_test_suite() {
             pool_admin,
             &keypairs[PAYER],
             &pool_pda,
-            &mints_key[USDC],
-            mints[USDC].decimals,
+            &usdc_mint,
+            6,
             add_custody_params,
             multisig_signers,
         )
@@ -162,6 +168,7 @@ pub async fn basic_test_suite() {
 
     let publish_time = get_current_unix_timestamp(&mut program_test_ctx).await;
 
+    // Price set as 1 +- 0.01
     test_set_test_oracle_price(
         &mut program_test_ctx,
         usdc_oracle_test_admin,
@@ -176,6 +183,31 @@ pub async fn basic_test_suite() {
             publish_time,
         },
         multisig_signers,
+    )
+    .await;
+
+    let alice_usdc_token_account =
+        find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &usdc_mint).0;
+
+    // Mint 10 USDC to Alice
+    program_test_ctx
+        .mint_tokens(
+            &keypairs[ROOT_AUTHORITY],
+            &usdc_mint,
+            &alice_usdc_token_account,
+            10_000_000,
+        )
+        .await
+        .unwrap();
+
+    // Add 1 USDC liquity
+    test_add_liquidity(
+        &mut program_test_ctx,
+        &keypairs[USER_ALICE],
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_mint,
+        AddLiquidityParams { amount: 1_000_000 },
     )
     .await;
 }
