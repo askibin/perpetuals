@@ -24,5 +24,44 @@ pub fn get_pool_pda(name: String) -> (Pubkey, u8) {
 }
 
 pub fn get_lp_token_mint_pda(pool_pda: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&["lp_token_mint".as_ref(), pool_pda.as_ref()], &perpetuals::id())
+    Pubkey::find_program_address(
+        &["lp_token_mint".as_ref(), pool_pda.as_ref()],
+        &perpetuals::id(),
+    )
+}
+
+pub fn get_custody_pda(pool_pda: &Pubkey, custody_token_mint: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            "custody".as_ref(),
+            pool_pda.as_ref(),
+            custody_token_mint.as_ref(),
+        ],
+        &perpetuals::id(),
+    )
+}
+
+pub fn get_custody_token_account_pda(
+    pool_pda: &Pubkey,
+    custody_token_mint: &Pubkey,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            "custody_token_account".as_ref(),
+            pool_pda.as_ref(),
+            custody_token_mint.as_ref(),
+        ],
+        &perpetuals::id(),
+    )
+}
+
+pub fn get_test_oracle_account(pool_pda: &Pubkey, custody_mint: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            "oracle_account".as_ref(),
+            pool_pda.as_ref(),
+            custody_mint.as_ref(),
+        ],
+        &perpetuals::id(),
+    )
 }
