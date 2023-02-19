@@ -350,6 +350,9 @@ impl Pool {
         Ok(available_amount >= amount)
     }
 
+    /// get_interest_amount_usd
+    ///
+    /// Calculates the interest accrued from opening the position until it's closed
     pub fn get_interest_amount_usd(&self, position: &Position, custody: &Custody) -> Result<u64> {
         let rate_diff = if custody.borrow_rate_sum > position.borrow_rate_sum {
             math::checked_sub(custody.borrow_rate_sum, position.borrow_rate_sum)? as u128

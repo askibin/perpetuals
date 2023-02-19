@@ -6,8 +6,8 @@ import {
   workspace,
   utils,
   BN,
-} from "@project-serum/anchor";
-import { Perpetuals } from "../../target/types/perpetuals";
+} from '@project-serum/anchor';
+import { Perpetuals } from '../../target/types/perpetuals';
 import {
   PublicKey,
   TransactionInstruction,
@@ -16,7 +16,7 @@ import {
   AccountMeta,
   Keypair,
   SYSVAR_RENT_PUBKEY,
-} from "@solana/web3.js";
+} from '@solana/web3.js';
 import {
   getAccount,
   getAssociatedTokenAddress,
@@ -24,40 +24,42 @@ import {
   createCloseAccountInstruction,
   createSyncNativeInstruction,
   TOKEN_PROGRAM_ID,
-} from "@solana/spl-token";
-import JSBI from "jsbi";
-import fetch from "node-fetch";
-import { sha256 } from "js-sha256";
-import { encode } from "bs58";
-import { readFileSync } from "fs";
+} from '@solana/spl-token';
+import JSBI from 'jsbi';
+import fetch from 'node-fetch';
+import { sha256 } from 'js-sha256';
+import { encode } from 'bs58';
+import { readFileSync } from 'fs';
 
-export type PositionSide = "long" | "short";
+export type PositionSide = 'long' | 'short';
+export const NOT_ADMIN_ERROR = 'NOT_ADMIN_ERROR';
 
 export class PerpetualsClient {
   provider: AnchorProvider;
   program: Program<Perpetuals>;
-  admin: Keypair;
+  admin: Keypair | undefined;
 
   // pdas
   multisig: { publicKey: PublicKey; bump: number };
   authority: { publicKey: PublicKey; bump: number };
   perpetuals: { publicKey: PublicKey; bump: number };
 
-  constructor(clusterUrl: string, adminKey: string) {
+  constructor(clusterUrl: string, adminKey?: string) {
     this.provider = AnchorProvider.local(clusterUrl, {
-      commitment: "confirmed",
-      preflightCommitment: "confirmed",
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed',
     });
     setProvider(this.provider);
     this.program = workspace.Perpetuals as Program<Perpetuals>;
 
-    this.admin = Keypair.fromSecretKey(
-      new Uint8Array(JSON.parse(readFileSync(adminKey).toString()))
-    );
+    if (adminKey)
+      this.admin = Keypair.fromSecretKey(
+        new Uint8Array(JSON.parse(readFileSync(adminKey).toString()))
+      );
 
-    this.multisig = this.findProgramAddress("multisig");
-    this.authority = this.findProgramAddress("transfer_authority");
-    this.perpetuals = this.findProgramAddress("perpetuals");
+    this.multisig = this.findProgramAddress('multisig');
+    this.authority = this.findProgramAddress('transfer_authority');
+    this.perpetuals = this.findProgramAddress('perpetuals');
 
     BN.prototype.toJSON = function () {
       return this.toString(10);
@@ -68,7 +70,7 @@ export class PerpetualsClient {
     let seeds = [Buffer.from(utils.bytes.utf8.encode(label))];
     if (extraSeeds) {
       for (let extraSeed of extraSeeds) {
-        if (typeof extraSeed === "string") {
+        if (typeof extraSeed === 'string') {
           seeds.push(Buffer.from(utils.bytes.utf8.encode(extraSeed)));
         } else if (Array.isArray(extraSeed)) {
           seeds.push(Buffer.from(extraSeed));
@@ -86,7 +88,7 @@ export class PerpetualsClient {
   };
 
   getPoolKey = (name: string) => {
-    return this.findProgramAddress("pool", name).publicKey;
+    return this.findProgramAddress('pool', name).publicKey;
   };
 
   getPool = async (name: string) => {
@@ -100,19 +102,19 @@ export class PerpetualsClient {
   };
 
   getPoolLpTokenKey = (name: string) => {
-    return this.findProgramAddress("lp_token_mint", [this.getPoolKey(name)])
+    return this.findProgramAddress('lp_token_mint', [this.getPoolKey(name)])
       .publicKey;
   };
 
   getCustodyKey = (poolName: string, tokenMint: PublicKey) => {
-    return this.findProgramAddress("custody", [
+    return this.findProgramAddress('custody', [
       this.getPoolKey(poolName),
       tokenMint,
     ]).publicKey;
   };
 
   getCustodyTokenAccountKey = (poolName: string, tokenMint: PublicKey) => {
-    return this.findProgramAddress("custody_token_account", [
+    return this.findProgramAddress('custody_token_account', [
       this.getPoolKey(poolName),
       tokenMint,
     ]).publicKey;
@@ -126,7 +128,7 @@ export class PerpetualsClient {
   };
 
   getCustodyTestOracleAccountKey = (poolName: string, tokenMint: PublicKey) => {
-    return this.findProgramAddress("oracle_account", [
+    return this.findProgramAddress('oracle_account', [
       this.getPoolKey(poolName),
       tokenMint,
     ]).publicKey;
@@ -158,11 +160,11 @@ export class PerpetualsClient {
   ) => {
     let pool = this.getPoolKey(poolName);
     let custody = this.getCustodyKey(poolName, tokenMint);
-    return this.findProgramAddress("position", [
+    return this.findProgramAddress('position', [
       wallet,
       pool,
       custody,
-      side === "long" ? [1] : [0],
+      side === 'long' ? [1] : [0],
     ]).publicKey;
   };
 
@@ -180,7 +182,7 @@ export class PerpetualsClient {
   getUserPositions = async (wallet: PublicKey) => {
     let data = encode(
       Buffer.concat([
-        this.getAccountDiscriminator("Position"),
+        this.getAccountDiscriminator('Position'),
         wallet.toBuffer(),
       ])
     );
@@ -238,7 +240,7 @@ export class PerpetualsClient {
   init = async (admins: Publickey[], config) => {
     let perpetualsProgramData = PublicKey.findProgramAddressSync(
       [this.program.programId.toBuffer()],
-      new PublicKey("BPFLoaderUpgradeab1e11111111111111111111111")
+      new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111')
     )[0];
 
     let adminMetas = [];
@@ -271,6 +273,7 @@ export class PerpetualsClient {
   };
 
   setAdminSigners = async (admins: Publickey[], minSignatures: number) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
     let adminMetas = [];
     for (const admin of admins) {
       adminMetas.push({
@@ -300,6 +303,8 @@ export class PerpetualsClient {
   };
 
   addPool = async (name: string) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
+
     await this.program.methods
       .addPool({ name })
       .accounts({
@@ -322,6 +327,8 @@ export class PerpetualsClient {
   };
 
   removePool = async (name: string) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
+
     await this.program.methods
       .removePool({})
       .accounts({
@@ -350,6 +357,8 @@ export class PerpetualsClient {
     fees,
     ratios
   ) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
+
     await this.program.methods
       .addCustody({
         isStable,
@@ -386,6 +395,7 @@ export class PerpetualsClient {
   };
 
   removeCustody = async (poolName: string, tokenMint: PublicKey) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
     await this.program.methods
       .removeCustody({})
       .accounts({
@@ -415,6 +425,7 @@ export class PerpetualsClient {
     tokenMint: PublicKey,
     isStable: boolean
   ) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
     await this.program.methods
       .upgradeCustody({ isStable })
       .accounts({
@@ -438,6 +449,7 @@ export class PerpetualsClient {
     borrowRate: typeof BN,
     borrowRateSum: typeof BN
   ) => {
+    if (!this.admin) throw new Error(NOT_ADMIN_ERROR);
     await this.program.methods
       .setBorrowRate({ borrowRate, borrowRateSum })
       .accounts({
@@ -527,7 +539,7 @@ export class PerpetualsClient {
       .getEntryPriceAndFee({
         collateral,
         size,
-        side: side === "long" ? { long: {} } : { short: {} },
+        side: side === 'long' ? { long: {} } : { short: {} },
       })
       .accounts({
         signer: this.provider.wallet.publicKey,
