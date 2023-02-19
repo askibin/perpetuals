@@ -92,7 +92,7 @@ pub struct AddLiquidity<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct AddLiquidityParams {
-    amount: u64,
+    pub amount: u64,
 }
 
 pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) -> Result<()> {
