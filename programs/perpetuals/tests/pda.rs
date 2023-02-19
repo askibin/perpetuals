@@ -18,3 +18,11 @@ pub fn get_program_data_pda() -> (Pubkey, u8) {
         &solana_program::bpf_loader_upgradeable::id(),
     )
 }
+
+pub fn get_pool_pda(name: String) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&["pool".as_ref(), name.as_bytes()], &perpetuals::id())
+}
+
+pub fn get_lp_token_mint_pda(pool_pda: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&["lp_token_mint".as_ref(), pool_pda.as_ref()], &perpetuals::id())
+}

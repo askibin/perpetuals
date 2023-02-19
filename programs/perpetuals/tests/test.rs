@@ -18,6 +18,12 @@ pub mod utils;
 const ROOT_AUTHORITY: usize = 0;
 const PERPETUALS_UPGRADE_AUTHORITY: usize = 1;
 const MULTISIG_MEMBER_A: usize = 2;
+const MULTISIG_MEMBER_B: usize = 3;
+const MULTISIG_MEMBER_C: usize = 4;
+const PAYER: usize = 5;
+
+const _USDC: usize = 0;
+const _BTC: usize = 1;
 
 #[tokio::test]
 async fn test_integration() {
@@ -27,7 +33,14 @@ async fn test_integration() {
     let mut program_test = ProgramTest::default();
 
     let keypairs = {
-        let keypairs = [Keypair::new(), Keypair::new(), Keypair::new()];
+        let keypairs = [
+            Keypair::new(),
+            Keypair::new(),
+            Keypair::new(),
+            Keypair::new(),
+            Keypair::new(),
+            Keypair::new(),
+        ];
 
         keypairs
             .iter()
@@ -98,6 +111,12 @@ async fn test_integration() {
     // ======================================================================
     let upgrade_authority = &keypairs[PERPETUALS_UPGRADE_AUTHORITY];
 
+    let multisig_signers = &[
+        &keypairs[MULTISIG_MEMBER_A],
+        &keypairs[MULTISIG_MEMBER_B],
+        &keypairs[MULTISIG_MEMBER_C],
+    ];
+
     // Init
     {
         let init_params = InitParams {
@@ -116,8 +135,17 @@ async fn test_integration() {
             &mut program_test_ctx,
             upgrade_authority,
             init_params,
-            &[&keypairs[MULTISIG_MEMBER_A]],
+            multisig_signers,
         )
         .await;
     }
+
+    test_add_pool(
+        &mut program_test_ctx,
+        &keypairs[MULTISIG_MEMBER_A],
+        &keypairs[PAYER],
+        "POOL A",
+        multisig_signers,
+    )
+    .await;
 }
