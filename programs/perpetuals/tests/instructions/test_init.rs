@@ -6,7 +6,7 @@ use perpetuals::{
 use solana_program_test::ProgramTestContext;
 use solana_sdk::signer::{keypair::Keypair, Signer};
 
-use crate::{pda, utils::get_account};
+use crate::utils::{get_account, pda};
 
 pub async fn test_init(
     program_test_ctx: &mut ProgramTestContext,

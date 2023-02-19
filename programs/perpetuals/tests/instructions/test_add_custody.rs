@@ -1,6 +1,5 @@
 use crate::{
-    pda::{self, get_custody_pda, get_custody_token_account_pda},
-    utils::get_account,
+    utils::{get_account, pda},
 };
 use anchor_lang::{
     prelude::{AccountMeta, Pubkey},
@@ -27,9 +26,9 @@ pub async fn test_add_custody(
     let multisig_pda = pda::get_multisig_pda().0;
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
     let perpetuals_pda = pda::get_perpetuals_pda().0;
-    let (custody_pda, custody_bump) = get_custody_pda(pool_pda, custody_token_mint);
+    let (custody_pda, custody_bump) = pda::get_custody_pda(pool_pda, custody_token_mint);
     let (custody_token_account_pda, custody_token_account_bump) =
-        get_custody_token_account_pda(pool_pda, custody_token_mint);
+        pda::get_custody_token_account_pda(pool_pda, custody_token_mint);
 
     let multisig_account = get_account::<Multisig>(program_test_ctx, multisig_pda).await;
 

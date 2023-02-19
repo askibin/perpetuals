@@ -1,6 +1,5 @@
 use crate::{
-    pda::{self},
-    utils::get_account,
+    utils::{get_account, pda},
 };
 use anchor_lang::{
     prelude::{AccountMeta, Pubkey},
