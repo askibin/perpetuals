@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-
 use solana_program_test::{ProgramTest, ProgramTestContext};
 use solana_sdk::{account, signature::Keypair};
 
@@ -42,4 +41,13 @@ pub async fn get_account<T: anchor_lang::AccountDeserialize>(
         .unwrap();
 
     T::try_deserialize(&mut account.data.as_slice()).unwrap()
+}
+
+pub async fn get_current_unix_timestamp(program_test_context: &mut ProgramTestContext) -> i64 {
+    program_test_context
+        .banks_client
+        .get_sysvar::<solana_program::sysvar::clock::Clock>()
+        .await
+        .unwrap()
+        .unix_timestamp
 }
