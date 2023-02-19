@@ -132,6 +132,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         curtime,
     )?;
 
+    custody.update_borrow_rate(curtime)?;
     require!(
         !pool.check_leverage(
             token_id,
@@ -196,6 +197,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
 
     // update custody stats
     msg!("Update custody stats");
+    custody.update_borrow_rate(curtime)?;
     custody.collected_fees.liquidation_usd = custody
         .collected_fees
         .liquidation_usd

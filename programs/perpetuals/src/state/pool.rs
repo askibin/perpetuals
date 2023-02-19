@@ -330,14 +330,19 @@ impl Pool {
     }
 
     pub fn get_interest_amount_usd(&self, position: &Position, custody: &Custody) -> Result<u64> {
-        let rate_diff = if custody.borrow_rate_state.rate_sum > position.borrow_rate_sum {
-            math::checked_sub(custody.borrow_rate_state.rate_sum, position.borrow_rate_sum)? as u128
+        let cumulative_interest = if custody.borrow_rate_state.cumulative_interest
+            > position.cumulative_interest_snapshot
+        {
+            math::checked_sub(
+                custody.borrow_rate_state.cumulative_interest,
+                position.cumulative_interest_snapshot,
+            )? as u128
         } else {
             return Ok(0);
         };
 
         math::checked_as_u64(math::checked_div(
-            math::checked_mul(rate_diff, position.size_usd as u128)?,
+            math::checked_mul(cumulative_interest, position.size_usd as u128)?,
             Perpetuals::RATE_POWER,
         )?)
     }
@@ -830,7 +835,7 @@ impl Pool {
 mod test {
     use super::*;
     use crate::state::{
-        custody::{Fees, OracleParams, PricingParams},
+        custody::{BorrowRateParams, Fees, OracleParams, PricingParams},
         oracle::OracleType,
         perpetuals::Permissions,
     };
@@ -1263,5 +1268,31 @@ mod test {
             )
             .unwrap()
         );
+    }
+
+    #[test]
+    fn test_get_interest_amount_usd() {
+        let (pool, mut custody, mut position, _token_price, _token_ema_price) = get_fixture();
+
+        custody.borrow_rate = BorrowRateParams {
+            base_rate: 0,
+            slope1: 80000,
+            slope2: 120000,
+            optimal_utilization: 800000000,
+        };
+        custody.assets.locked = scale(9, 5);
+        custody.assets.owned = scale(10, 5);
+
+        custody.update_borrow_rate(3600).unwrap();
+        let interest = pool.get_interest_amount_usd(&position, &custody).unwrap();
+        assert_eq!(interest, 0);
+
+        custody.update_borrow_rate(7200).unwrap();
+        let interest = pool.get_interest_amount_usd(&position, &custody).unwrap();
+        assert_eq!(interest, scale_f64(0.14, Perpetuals::USD_DECIMALS));
+
+        position.cumulative_interest_snapshot = 70000;
+        let interest = pool.get_interest_amount_usd(&position, &custody).unwrap();
+        assert_eq!(interest, scale_f64(0.07, Perpetuals::USD_DECIMALS));
     }
 }

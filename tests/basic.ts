@@ -268,7 +268,7 @@ describe("perpetuals", () => {
       },
       borrowRateState: {
         currentRate: "0",
-        rateSum: "0",
+        cumulativeInterest: "0",
         lastUpdate: "0",
       },
       bump: token.bump,
@@ -423,7 +423,7 @@ describe("perpetuals", () => {
       collateralUsd: "123000000",
       unrealizedProfitUsd: "0",
       unrealizedLossUsd: "0",
-      borrowRateSum: "0",
+      cumulativeInterestSnapshot: "0",
       lockedAmount: "7000000000",
       collateralAmount: "1000000000",
       bump: position.bump,

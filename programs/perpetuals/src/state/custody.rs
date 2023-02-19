@@ -105,7 +105,7 @@ pub struct BorrowRateParams {
 pub struct BorrowRateState {
     // borrow rates have implied RATE_DECIMALS decimals
     pub current_rate: u64,
-    pub rate_sum: u128,
+    pub cumulative_interest: u128,
     pub last_update: i64,
 }
 
@@ -220,15 +220,34 @@ impl Custody {
         // else:
         //   rate = base_rate + slope1 + (current_utilization - optimal_utilization) / (1 - optimal_utilization) * slope2
 
-        if curtime <= self.borrow_rate_state.last_update {
+        if self.assets.owned == 0 {
+            self.borrow_rate_state.current_rate = 0;
+            self.borrow_rate_state.last_update = curtime;
             return Ok(());
         }
 
+        if curtime > self.borrow_rate_state.last_update {
+            // compute interest accumulated since previous update
+            let cumulative_interest = math::checked_div(
+                math::checked_mul(
+                    math::checked_sub(curtime, self.borrow_rate_state.last_update)? as u128,
+                    self.borrow_rate_state.current_rate as u128,
+                )?,
+                3600,
+            )?;
+            self.borrow_rate_state.cumulative_interest = math::checked_add(
+                self.borrow_rate_state.cumulative_interest,
+                cumulative_interest,
+            )?;
+        }
+
+        // get current utilization
         let current_utilization = math::checked_div(
             math::checked_mul(self.assets.locked as u128, Perpetuals::RATE_POWER)?,
             self.assets.owned as u128,
         )?;
 
+        // compute and save new borrow rate
         let hourly_rate = if current_utilization < (self.borrow_rate.optimal_utilization as u128)
             || (self.borrow_rate.optimal_utilization as u128) >= Perpetuals::RATE_POWER
         {
@@ -256,15 +275,9 @@ impl Custody {
             self.borrow_rate.base_rate,
         )?;
 
-        let rate_per_second = math::checked_div(hourly_rate, 3600)?;
-        let rate_sum = math::checked_mul(
-            math::checked_sub(curtime, self.borrow_rate_state.last_update)? as u128,
-            rate_per_second as u128,
-        )?;
-
         self.borrow_rate_state.current_rate = hourly_rate;
-        self.borrow_rate_state.rate_sum = rate_sum;
-        self.borrow_rate_state.last_update = curtime;
+        self.borrow_rate_state.last_update =
+            std::cmp::max(curtime, self.borrow_rate_state.last_update);
 
         Ok(())
     }
@@ -272,4 +285,126 @@ impl Custody {
 
 impl DeprecatedCustody {
     pub const LEN: usize = 8 + std::mem::size_of::<DeprecatedCustody>();
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn get_fixture() -> Custody {
+        let assets = Assets {
+            owned: 1000,
+            locked: 500,
+            ..Assets::default()
+        };
+
+        let borrow_rate = BorrowRateParams {
+            base_rate: 0,
+            slope1: 80000,
+            slope2: 120000,
+            optimal_utilization: 800000000,
+        };
+
+        Custody {
+            decimals: 5,
+            assets,
+            borrow_rate,
+            ..Custody::default()
+        }
+    }
+
+    #[test]
+    fn test_update_borrow_rate() {
+        let mut custody = get_fixture();
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(
+            custody.borrow_rate_state,
+            BorrowRateState {
+                current_rate: 50000,
+                cumulative_interest: 0,
+                last_update: 3600
+            }
+        );
+        custody.update_borrow_rate(5400).unwrap();
+        assert_eq!(
+            custody.borrow_rate_state,
+            BorrowRateState {
+                current_rate: 50000,
+                cumulative_interest: 25000,
+                last_update: 5400
+            }
+        );
+        custody.update_borrow_rate(7200).unwrap();
+        assert_eq!(
+            custody.borrow_rate_state,
+            BorrowRateState {
+                current_rate: 50000,
+                cumulative_interest: 50000,
+                last_update: 7200
+            }
+        );
+
+        let mut custody = get_fixture();
+        custody.update_borrow_rate(3600).unwrap();
+        custody.update_borrow_rate(7200).unwrap();
+        assert_eq!(
+            custody.borrow_rate_state,
+            BorrowRateState {
+                current_rate: 50000,
+                cumulative_interest: 50000,
+                last_update: 7200
+            }
+        );
+
+        let mut custody = get_fixture();
+        custody.assets.locked = 0;
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(
+            custody.borrow_rate_state,
+            BorrowRateState {
+                current_rate: 0,
+                cumulative_interest: 0,
+                last_update: 3600
+            }
+        );
+
+        let mut custody = get_fixture();
+        custody.assets.locked = 800;
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 80000);
+
+        let mut custody = get_fixture();
+        custody.assets.locked = 900;
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 140000);
+
+        custody.update_borrow_rate(5400).unwrap();
+        assert_eq!(custody.borrow_rate_state.cumulative_interest, 70000);
+
+        custody.update_borrow_rate(7200).unwrap();
+        assert_eq!(custody.borrow_rate_state.cumulative_interest, 140000);
+
+        custody.assets.locked = 500;
+        custody.update_borrow_rate(10800).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 50000);
+        assert_eq!(custody.borrow_rate_state.cumulative_interest, 280000);
+        custody.update_borrow_rate(14400).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 50000);
+        assert_eq!(custody.borrow_rate_state.cumulative_interest, 330000);
+
+        let mut custody = get_fixture();
+        custody.assets.locked = 1000;
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 200000);
+
+        let mut custody = get_fixture();
+        custody.assets.locked = 1;
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 100);
+
+        let mut custody = get_fixture();
+        custody.assets.locked = 999;
+        custody.update_borrow_rate(3600).unwrap();
+        assert_eq!(custody.borrow_rate_state.current_rate, 199400);
+    }
 }

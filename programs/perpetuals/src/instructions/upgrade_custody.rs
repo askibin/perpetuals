@@ -126,7 +126,7 @@ pub fn upgrade_custody<'info>(
 
     let borrow_rate_state = BorrowRateState {
         current_rate: deprecated_custody.borrow_rate,
-        rate_sum: deprecated_custody.borrow_rate_sum as u128,
+        cumulative_interest: deprecated_custody.borrow_rate_sum as u128,
         last_update: 0,
     };
 
