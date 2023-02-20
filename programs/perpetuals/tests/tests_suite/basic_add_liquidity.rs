@@ -106,6 +106,7 @@ pub async fn basic_add_liquidity_test_suite() {
                 swap_spread: 200,
                 min_initial_leverage: 10_000,
                 max_leverage: 1_000_000,
+                max_payoff_mult: 10,
             },
             permissions: Permissions {
                 allow_swap: true,
