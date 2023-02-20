@@ -1,47 +1,65 @@
-use anchor_lang::{prelude::Pubkey, InstructionData, ToAccountMetas};
-use perpetuals::instructions::InitParams;
+use anchor_lang::{prelude::AccountMeta, InstructionData, ToAccountMetas};
+use perpetuals::{
+    instructions::InitParams,
+    state::{multisig::Multisig, perpetuals::Perpetuals},
+};
 use solana_program_test::ProgramTestContext;
 use solana_sdk::signer::{keypair::Keypair, Signer};
 
-use crate::pda;
+use crate::utils::{get_account, pda};
 
-#[allow(unaligned_references)]
 pub async fn test_init(
     program_test_ctx: &mut ProgramTestContext,
     upgrade_authority: &Keypair,
-    multisig: &Pubkey,
-    transfer_authority: &Pubkey,
-    perpetuals: &Pubkey,
-    perpetuals_program: &Pubkey,
     params: InitParams,
+    multisig_signers: &[&Keypair],
 ) {
     // ==== WHEN ==============================================================
-    let (perpetuals_program_data, _) = pda::get_program_buffer_pda();
-    let accounts = perpetuals::accounts::Init {
-        upgrade_authority: upgrade_authority.pubkey(),
-        multisig: *multisig,
-        transfer_authority: *transfer_authority,
-        perpetuals: *perpetuals,
-        perpetuals_program: *perpetuals_program,
-        perpetuals_program_data: perpetuals_program_data,
-        system_program: anchor_lang::system_program::ID,
-        token_program: anchor_spl::token::ID,
+    let perpetuals_program_data_pda = pda::get_program_data_pda().0;
+    let (multisig_pda, multisig_bump) = pda::get_multisig_pda();
+    let (transfer_authority_pda, transfer_authority_bump) = pda::get_transfer_authority_pda();
+    let (perpetuals_pda, perpetuals_bump) = pda::get_perpetuals_pda();
+
+    let accounts_meta = {
+        let accounts = perpetuals::accounts::Init {
+            upgrade_authority: upgrade_authority.pubkey(),
+            multisig: multisig_pda,
+            transfer_authority: transfer_authority_pda,
+            perpetuals: perpetuals_pda,
+            perpetuals_program: perpetuals::ID,
+            perpetuals_program_data: perpetuals_program_data_pda,
+            system_program: anchor_lang::system_program::ID,
+            token_program: anchor_spl::token::ID,
+        };
+
+        let mut accounts_meta = accounts.to_account_metas(None);
+
+        for signer in multisig_signers {
+            accounts_meta.push(AccountMeta {
+                pubkey: signer.pubkey(),
+                is_signer: true,
+                is_writable: false,
+            });
+        }
+
+        accounts_meta
     };
 
     let arguments = perpetuals::instruction::Init { params };
 
     let ix = solana_sdk::instruction::Instruction {
         program_id: perpetuals::id(),
-        accounts: accounts.to_account_metas(None),
+        accounts: accounts_meta,
         data: arguments.data(),
     };
 
     let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
         &[ix],
         Some(&upgrade_authority.pubkey()),
-        &[upgrade_authority],
+        &[&[upgrade_authority], multisig_signers].concat(),
         program_test_ctx.last_blockhash,
     );
+
     program_test_ctx
         .banks_client
         .process_transaction(tx)
@@ -49,47 +67,46 @@ pub async fn test_init(
         .unwrap();
 
     // ==== THEN ==============================================================
-    // let cortex_account = program_test_ctx
-    //     .banks_client
-    //     .get_account(cortex_pda)
-    //     .await
-    //     .unwrap()
-    //     .unwrap();
-    // let cortex_account_data =
-    //     adrena::state::Cortex::try_deserialize(&mut cortex_account.data.as_slice()).unwrap();
-    // assert_eq!(cortex_account_data.bump, cortex_bump);
-    // assert_eq!(
-    //     cortex_account_data.fee_token_account_bump,
-    //     fee_token_account_bump
-    // );
-    // assert_eq!(cortex_account_data.lp_token_mint_bump, lp_token_mint_bump);
-    // assert_eq!(cortex_account_data.authority, authority.pubkey());
-    // assert_eq!(cortex_account_data.fee_token_account, fee_token_account_pda);
-    // assert_eq!(cortex_account_data.lp_token_mint, lp_token_mint_pda);
-    // assert_eq!(cortex_account_data.lp_token_mint_decimals, lp_mint_decimals);
-    // // vaults
-    // let vault_count = cortex_account_data.vaults_count;
-    // assert_eq!(vault_count, DEFAULT_VAULT_COUNT);
-    // // Vaults uninitialized content unchecked
-    // // cache
-    // let default_cache = CortexCache::default();
-    // let cache = cortex_account_data.cache;
-    // let fee_token_usd_price = cache.fee_token_usd_price;
-    // let default_fee_token_usd_price = default_cache.fee_token_usd_price;
-    // assert_eq!(fee_token_usd_price, default_fee_token_usd_price);
-    // let last_update = cache.last_update;
-    // let default_last_update = default_cache.last_update;
-    // assert_eq!(last_update, default_last_update);
-    // // metrics
-    // let default_metrics = CortexMetrics::default();
-    // let metrics = cortex_account_data.metrics;
-    // let fee_generated = metrics.fee_generated;
-    // let default_fee_generated = default_metrics.fee_generated;
-    // assert_eq!(fee_generated, default_fee_generated);
-    // let lp_token_supply = metrics.lp_token_supply;
-    // let default_lp_token_supply = default_metrics.lp_token_supply;
-    // assert_eq!(lp_token_supply, default_lp_token_supply);
-    // let usd_cumulative_volume = metrics.usd_cumulative_volume;
-    // let default_usd_cumulative_volume = default_metrics.usd_cumulative_volume;
-    // assert_eq!(usd_cumulative_volume, default_usd_cumulative_volume);
+    let perpetuals_account = get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
+
+    // Assert permissions
+    {
+        let p = perpetuals_account.permissions;
+
+        assert_eq!(p.allow_swap, params.allow_swap);
+        assert_eq!(p.allow_add_liquidity, params.allow_add_liquidity);
+        assert_eq!(p.allow_remove_liquidity, params.allow_remove_liquidity);
+        assert_eq!(p.allow_open_position, params.allow_open_position);
+        assert_eq!(p.allow_close_position, params.allow_close_position);
+        assert_eq!(p.allow_pnl_withdrawal, params.allow_pnl_withdrawal);
+        assert_eq!(
+            p.allow_collateral_withdrawal,
+            params.allow_collateral_withdrawal
+        );
+        assert_eq!(p.allow_size_change, params.allow_size_change);
+    }
+
+    assert_eq!(
+        perpetuals_account.transfer_authority_bump,
+        transfer_authority_bump
+    );
+    assert_eq!(perpetuals_account.perpetuals_bump, perpetuals_bump);
+
+    let multisig_account = get_account::<Multisig>(program_test_ctx, multisig_pda).await;
+
+    // Assert multisig
+    {
+        assert_eq!(multisig_account.bump, multisig_bump);
+        assert_eq!(multisig_account.min_signatures, params.min_signatures);
+
+        // Check signers
+        {
+            let mut i = 0;
+            for signer in multisig_signers {
+                assert_eq!(multisig_account.signers[i], signer.pubkey());
+
+                i += 1;
+            }
+        }
+    }
 }
