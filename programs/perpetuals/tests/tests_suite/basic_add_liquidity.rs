@@ -166,7 +166,7 @@ pub async fn basic_add_liquidity_test_suite() {
         &usdc_test_oracle_pda,
         SetTestOraclePriceParams {
             price: 1_000_000,
-            expo: 6,
+            expo: -6,
             conf: 10_000,
             publish_time,
         },
