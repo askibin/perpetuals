@@ -214,6 +214,24 @@ impl Custody {
             && self.borrow_rate.validate()
     }
 
+    pub fn get_cumulative_interest(&self, curtime: i64) -> Result<u128> {
+        if curtime > self.borrow_rate_state.last_update {
+            let cumulative_interest = math::checked_ceil_div(
+                math::checked_mul(
+                    math::checked_sub(curtime, self.borrow_rate_state.last_update)? as u128,
+                    self.borrow_rate_state.current_rate as u128,
+                )?,
+                3600,
+            )?;
+            math::checked_add(
+                self.borrow_rate_state.cumulative_interest,
+                cumulative_interest,
+            )
+        } else {
+            Ok(self.borrow_rate_state.cumulative_interest)
+        }
+    }
+
     pub fn update_borrow_rate(&mut self, curtime: i64) -> Result<()> {
         // if current_utilization < optimal_utilization:
         //   rate = base_rate + (current_utilization / optimal_utilization) * slope1
@@ -222,23 +240,15 @@ impl Custody {
 
         if self.assets.owned == 0 {
             self.borrow_rate_state.current_rate = 0;
-            self.borrow_rate_state.last_update = curtime;
+            self.borrow_rate_state.last_update =
+                std::cmp::max(curtime, self.borrow_rate_state.last_update);
             return Ok(());
         }
 
         if curtime > self.borrow_rate_state.last_update {
             // compute interest accumulated since previous update
-            let cumulative_interest = math::checked_div(
-                math::checked_mul(
-                    math::checked_sub(curtime, self.borrow_rate_state.last_update)? as u128,
-                    self.borrow_rate_state.current_rate as u128,
-                )?,
-                3600,
-            )?;
-            self.borrow_rate_state.cumulative_interest = math::checked_add(
-                self.borrow_rate_state.cumulative_interest,
-                cumulative_interest,
-            )?;
+            self.borrow_rate_state.cumulative_interest = self.get_cumulative_interest(curtime)?;
+            self.borrow_rate_state.last_update = curtime;
         }
 
         // get current utilization
@@ -276,8 +286,6 @@ impl Custody {
         )?;
 
         self.borrow_rate_state.current_rate = hourly_rate;
-        self.borrow_rate_state.last_update =
-            std::cmp::max(curtime, self.borrow_rate_state.last_update);
 
         Ok(())
     }

@@ -182,7 +182,6 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
 
     // init new position
     msg!("Initialize new position");
-    custody.update_borrow_rate(curtime)?;
     let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
     let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
 
@@ -197,7 +196,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     position.collateral_usd = collateral_usd;
     position.unrealized_profit_usd = 0;
     position.unrealized_loss_usd = 0;
-    position.cumulative_interest_snapshot = custody.borrow_rate_state.cumulative_interest;
+    position.cumulative_interest_snapshot = custody.get_cumulative_interest(curtime)?;
     position.locked_amount = math::checked_as_u64(math::checked_div(
         math::checked_mul(params.size as u128, custody.pricing.max_payoff_mult as u128)?,
         Perpetuals::BPS_POWER,
@@ -221,6 +220,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
             &token_price,
             &token_ema_price,
             custody,
+            curtime,
             true
         )?,
         PerpetualsError::MaxLeverage

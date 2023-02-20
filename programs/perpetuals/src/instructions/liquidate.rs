@@ -132,7 +132,6 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         curtime,
     )?;
 
-    custody.update_borrow_rate(curtime)?;
     require!(
         !pool.check_leverage(
             token_id,
@@ -140,6 +139,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
             &token_price,
             &token_ema_price,
             custody,
+            curtime,
             false
         )?,
         PerpetualsError::InvalidPositionState
@@ -153,6 +153,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         &token_ema_price,
         custody,
         position.size_usd,
+        curtime,
         true,
     )?;
 

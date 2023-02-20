@@ -142,7 +142,6 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
     }
 
     msg!("Settle position");
-    custody.update_borrow_rate(curtime)?;
     let (transfer_amount, fee_amount, profit_usd, loss_usd) = pool.get_close_amount(
         token_id,
         position,
@@ -150,6 +149,7 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
         &token_ema_price,
         custody,
         position.size_usd,
+        curtime,
         false,
     )?;
 
