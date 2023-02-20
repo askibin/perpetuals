@@ -15,7 +15,7 @@ pub async fn test_init(
     multisig_signers: &[&Keypair],
 ) {
     // ==== WHEN ==============================================================
-    let perpetuals_program_data = pda::get_program_data_pda().0;
+    let perpetuals_program_data_pda = pda::get_program_data_pda().0;
     let (multisig_pda, multisig_bump) = pda::get_multisig_pda();
     let (transfer_authority_pda, transfer_authority_bump) = pda::get_transfer_authority_pda();
     let (perpetuals_pda, perpetuals_bump) = pda::get_perpetuals_pda();
@@ -27,7 +27,7 @@ pub async fn test_init(
             transfer_authority: transfer_authority_pda,
             perpetuals: perpetuals_pda,
             perpetuals_program: perpetuals::ID,
-            perpetuals_program_data,
+            perpetuals_program_data: perpetuals_program_data_pda,
             system_program: anchor_lang::system_program::ID,
             token_program: anchor_spl::token::ID,
         };

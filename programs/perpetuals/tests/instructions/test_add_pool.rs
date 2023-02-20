@@ -11,7 +11,6 @@ use solana_sdk::signer::{keypair::Keypair, Signer};
 
 pub async fn test_add_pool(
     program_test_ctx: &mut ProgramTestContext,
-
     // Admin must be a part of the multisig
     admin: &Keypair,
     payer: &Keypair,
@@ -28,7 +27,7 @@ pub async fn test_add_pool(
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
     let perpetuals_pda = pda::get_perpetuals_pda().0;
     let (pool_pda, pool_bump) = pda::get_pool_pda(String::from_str(pool_name).unwrap());
-    let (lp_token_mint_pda, lp_token_bump) = pda::get_lp_token_mint_pda(&pool_pda);
+    let (lp_token_mint_pda, lp_token_mint_bump) = pda::get_lp_token_mint_pda(&pool_pda);
 
     let multisig_account = get_account::<Multisig>(program_test_ctx, multisig_pda).await;
 
@@ -91,7 +90,7 @@ pub async fn test_add_pool(
 
     assert_eq!(pool_account.name.as_str(), pool_name);
     assert_eq!(pool_account.bump, pool_bump);
-    assert_eq!(pool_account.lp_token_bump, lp_token_bump);
+    assert_eq!(pool_account.lp_token_bump, lp_token_mint_bump);
 
     let perpetuals_account = get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
 
@@ -101,5 +100,5 @@ pub async fn test_add_pool(
         pool_account.inception_time
     );
 
-    (pool_pda, pool_bump, lp_token_mint_pda, lp_token_bump)
+    (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump)
 }
