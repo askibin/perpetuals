@@ -4,11 +4,10 @@ use crate::{
         test_set_test_oracle_price,
     },
     utils::{
-        add_perpetuals_program, create_and_fund_multiple_accounts, find_associated_token_account,
-        get_current_unix_timestamp, get_test_oracle_account,
+        add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
+        get_test_oracle_account, initialize_token_account,
     },
 };
-use anchor_lang::prelude::Pubkey;
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{AddCustodyParams, AddLiquidityParams, InitParams, SetTestOraclePriceParams},
@@ -21,9 +20,6 @@ use perpetuals::{
 use solana_program_test::ProgramTest;
 use solana_sdk::signer::Signer;
 
-// =============================================
-// ===> Keypair details
-// =============================================
 const ROOT_AUTHORITY: usize = 0;
 const PERPETUALS_UPGRADE_AUTHORITY: usize = 1;
 const MULTISIG_MEMBER_A: usize = 2;
@@ -31,20 +27,16 @@ const MULTISIG_MEMBER_B: usize = 3;
 const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
 const USER_ALICE: usize = 6;
-// ==============================================
-const KEYPAIRS_COUNT: usize = 7;
-// ==============================================
 
-pub async fn basic_test_suite() {
-    // ======================================================================
-    // ====> Setup
-    // ======================================================================
+const KEYPAIRS_COUNT: usize = 7;
+
+pub async fn basic_add_liquidity_test_suite() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
     let keypairs = create_and_fund_multiple_accounts(&mut program_test, KEYPAIRS_COUNT).await;
 
-    // Initialize the mints
+    // Initialize mints
     let usdc_mint = program_test
         .add_mint(None, 6, &keypairs[ROOT_AUTHORITY].pubkey())
         .0;
@@ -55,16 +47,6 @@ pub async fn basic_test_suite() {
     // Start the client and connect to localnet validator
     let mut program_test_ctx = program_test.start_with_context().await;
 
-    // Initialize Token Accounts
-    let keys = keypairs.iter().map(|k| k.pubkey()).collect::<Vec<Pubkey>>();
-    let usdc_token_accounts = program_test_ctx
-        .initialize_token_accounts(usdc_mint, &keys)
-        .await
-        .unwrap();
-
-    // ======================================================================
-    // ====> Run
-    // ======================================================================
     let upgrade_authority = &keypairs[PERPETUALS_UPGRADE_AUTHORITY];
 
     let multisig_signers = &[
@@ -97,7 +79,7 @@ pub async fn basic_test_suite() {
 
     let pool_admin = &keypairs[MULTISIG_MEMBER_A];
 
-    let (pool_pda, _, _lp_token_mint_pda, _) = test_add_pool(
+    let (pool_pda, _, lp_token_mint_pda, _) = test_add_pool(
         &mut program_test_ctx,
         pool_admin,
         &keypairs[PAYER],
@@ -105,14 +87,7 @@ pub async fn basic_test_suite() {
         multisig_signers,
     )
     .await;
-// asdsad
-    let lp_token_mint_pda = crate::utils::pda::get_lp_token_mint_pda(&pool_pda).0;
-    let _lp_token_accounts = program_test_ctx
-        .initialize_token_accounts(lp_token_mint_pda, &keys)
-        .await
-        .unwrap();
 
-    // Get USDC test oracle address
     let usdc_test_oracle_pda = get_test_oracle_account(&pool_pda, &usdc_mint).0;
 
     let usdc_custody_pda = {
@@ -154,9 +129,10 @@ pub async fn basic_test_suite() {
                 liquidation: 100,
                 protocol_share: 10,
             },
-            target_ratio: 50,
-            min_ratio: 25,
-            max_ratio: 75,
+            // Expressed in USD value
+            target_ratio: 10_000,
+            min_ratio: 0,
+            max_ratio: 100_000,
         };
 
         let usdc_custody_pda = test_add_custody(
@@ -197,12 +173,27 @@ pub async fn basic_test_suite() {
     )
     .await;
 
+    // Initialize Alice usdc and lp token associated token accounts
+    let alice_usdc_token_account = initialize_token_account(
+        &mut program_test_ctx,
+        &usdc_mint,
+        &keypairs[USER_ALICE].pubkey(),
+    )
+    .await;
+
+    initialize_token_account(
+        &mut program_test_ctx,
+        &lp_token_mint_pda,
+        &keypairs[USER_ALICE].pubkey(),
+    )
+    .await;
+
     // Mint 10 USDC to Alice
     program_test_ctx
         .mint_tokens(
             &keypairs[ROOT_AUTHORITY],
             &usdc_mint,
-            &usdc_token_accounts[USER_ALICE],
+            &alice_usdc_token_account,
             10_000_000,
         )
         .await
@@ -215,7 +206,7 @@ pub async fn basic_test_suite() {
         &keypairs[PAYER],
         &pool_pda,
         &usdc_mint,
-        AddLiquidityParams { amount: 1_000_000 },
+        AddLiquidityParams { amount: 10_000 },
     )
     .await;
 }

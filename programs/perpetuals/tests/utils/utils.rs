@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anchor_lang::prelude::*;
+use bonfida_test_utils::ProgramTestContextExt;
 use solana_program::{bpf_loader_upgradeable, stake_history::Epoch};
 use solana_program_test::{read_file, ProgramTest, ProgramTestContext};
 use solana_sdk::{account, signature::Keypair, signer::Signer};
@@ -35,10 +36,10 @@ pub fn copy_keypair(keypair: &Keypair) -> Keypair {
 }
 
 pub async fn get_account<T: anchor_lang::AccountDeserialize>(
-    program_test_context: &mut ProgramTestContext,
+    program_test_ctx: &mut ProgramTestContext,
     key: Pubkey,
 ) -> T {
-    let account = program_test_context
+    let account = program_test_ctx
         .banks_client
         .get_account(key)
         .await
@@ -48,13 +49,24 @@ pub async fn get_account<T: anchor_lang::AccountDeserialize>(
     T::try_deserialize(&mut account.data.as_slice()).unwrap()
 }
 
-pub async fn get_current_unix_timestamp(program_test_context: &mut ProgramTestContext) -> i64 {
-    program_test_context
+pub async fn get_current_unix_timestamp(program_test_ctx: &mut ProgramTestContext) -> i64 {
+    program_test_ctx
         .banks_client
         .get_sysvar::<solana_program::sysvar::clock::Clock>()
         .await
         .unwrap()
         .unix_timestamp
+}
+
+pub async fn initialize_token_account(
+    program_test_ctx: &mut ProgramTestContext,
+    mint: &Pubkey,
+    owner: &Pubkey,
+) -> Pubkey {
+    program_test_ctx
+        .initialize_token_accounts(*mint, &[*owner])
+        .await
+        .unwrap()[0]
 }
 
 // Deploy the perpetuals program onchain as upgradeable program

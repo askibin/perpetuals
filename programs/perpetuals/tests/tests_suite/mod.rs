@@ -1,3 +1,3 @@
-pub mod basic;
+pub mod basic_add_liquidity;
 
-pub use basic::*;
+pub use basic_add_liquidity::*;
