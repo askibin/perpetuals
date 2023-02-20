@@ -200,14 +200,14 @@ pub async fn basic_add_liquidity_test_suite() {
         .await
         .unwrap();
 
-    // Add 1 USDC liquity
+    // Add 1 USDC liquidity
     test_add_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
         &keypairs[PAYER],
         &pool_pda,
         &usdc_mint,
-        AddLiquidityParams { amount: 10_000 },
+        AddLiquidityParams { amount: 1_000_000 },
     )
     .await;
 }
