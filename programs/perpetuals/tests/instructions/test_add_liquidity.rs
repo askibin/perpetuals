@@ -1,7 +1,13 @@
 use crate::utils::{find_associated_token_account, get_account, pda};
-use anchor_lang::{prelude::Pubkey, InstructionData, ToAccountMetas};
+use anchor_lang::{
+    prelude::{AccountMeta, Pubkey},
+    InstructionData, ToAccountMetas,
+};
 use bonfida_test_utils::ProgramTestContextExt;
-use perpetuals::{instructions::AddLiquidityParams, state::custody::Custody};
+use perpetuals::{
+    instructions::AddLiquidityParams,
+    state::{custody::Custody, pool::Pool},
+};
 use solana_program_test::ProgramTestContext;
 use solana_sdk::signer::{keypair::Keypair, Signer};
 
@@ -60,7 +66,31 @@ pub async fn test_add_liquidity(
             token_program: anchor_spl::token::ID,
         };
 
-        accounts.to_account_metas(None)
+        let mut accounts_meta = accounts.to_account_metas(None);
+
+        let pool_account = get_account::<Pool>(program_test_ctx, *pool_pda).await;
+
+        // For each token, add custody account as remaining_account
+        for token in pool_account.tokens.as_slice() {
+            accounts_meta.push(AccountMeta {
+                pubkey: token.custody,
+                is_signer: false,
+                is_writable: false,
+            });
+        }
+
+        // For each token, add custody oracle account as remaining_account
+        for token in pool_account.tokens.as_slice() {
+            let custody_account = get_account::<Custody>(program_test_ctx, token.custody).await;
+
+            accounts_meta.push(AccountMeta {
+                pubkey: custody_account.oracle.oracle_account,
+                is_signer: false,
+                is_writable: false,
+            });
+        }
+
+        accounts_meta
     };
 
     let arguments = perpetuals::instruction::AddLiquidity { params };
