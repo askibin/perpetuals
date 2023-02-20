@@ -8,6 +8,7 @@ use crate::{
         get_current_unix_timestamp, get_test_oracle_account,
     },
 };
+use anchor_lang::prelude::Pubkey;
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{AddCustodyParams, AddLiquidityParams, InitParams, SetTestOraclePriceParams},
@@ -53,6 +54,14 @@ pub async fn basic_test_suite() {
 
     // Start the client and connect to localnet validator
     let mut program_test_ctx = program_test.start_with_context().await;
+
+    // Initialize Token Accounts
+    let keys = keypairs.iter().map(|k| k.pubkey()).collect::<Vec<Pubkey>>();
+    let usdc_token_accounts = program_test_ctx
+        .initialize_token_accounts(usdc_mint, &keys)
+        .await
+        .unwrap();
+    // let usdc_token_accounts = program_test_ctx.initialize_token_accounts(usdc_mint, &keys); // do the same with other mints
 
     // ======================================================================
     // ====> Run
@@ -183,15 +192,12 @@ pub async fn basic_test_suite() {
     )
     .await;
 
-    let alice_usdc_token_account =
-        find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &usdc_mint).0;
-
     // Mint 10 USDC to Alice
     program_test_ctx
         .mint_tokens(
             &keypairs[ROOT_AUTHORITY],
             &usdc_mint,
-            &alice_usdc_token_account,
+            &usdc_token_accounts[USER_ALICE],
             10_000_000,
         )
         .await
