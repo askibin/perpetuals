@@ -23,10 +23,10 @@ pub fn find_associated_token_account(owner: &Pubkey, mint: &Pubkey) -> (Pubkey, 
     Pubkey::find_program_address(
         &[
             owner.as_ref(),
-            anchor_spl::associated_token::ID.as_ref(),
+            anchor_spl::token::ID.as_ref(),
             mint.as_ref(),
         ],
-        &perpetuals::id(),
+        &anchor_spl::associated_token::ID,
     )
 }
 

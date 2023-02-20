@@ -61,7 +61,6 @@ pub async fn basic_test_suite() {
         .initialize_token_accounts(usdc_mint, &keys)
         .await
         .unwrap();
-    // let usdc_token_accounts = program_test_ctx.initialize_token_accounts(usdc_mint, &keys); // do the same with other mints
 
     // ======================================================================
     // ====> Run
@@ -106,6 +105,12 @@ pub async fn basic_test_suite() {
         multisig_signers,
     )
     .await;
+// asdsad
+    let lp_token_mint_pda = crate::utils::pda::get_lp_token_mint_pda(&pool_pda).0;
+    let _lp_token_accounts = program_test_ctx
+        .initialize_token_accounts(lp_token_mint_pda, &keys)
+        .await
+        .unwrap();
 
     // Get USDC test oracle address
     let usdc_test_oracle_pda = get_test_oracle_account(&pool_pda, &usdc_mint).0;
