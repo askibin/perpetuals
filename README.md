@@ -137,6 +137,3 @@ Solana Perpetuals codebase is released under [Apache License 2.0](LICENSE).
 By accessing or using Solana Perpetuals or any of its components, you accept and agree with the [Disclaimer](DISCLAIMER.md).
 
 
-
-
-
