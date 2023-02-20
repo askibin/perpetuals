@@ -32,6 +32,7 @@ pub struct Position {
     pub owner: Pubkey,
     pub pool: Pubkey,
     pub custody: Pubkey,
+    pub lock_custody: Pubkey,
 
     pub open_time: i64,
     pub update_time: i64,

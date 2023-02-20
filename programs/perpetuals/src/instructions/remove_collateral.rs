@@ -22,7 +22,7 @@ pub struct RemoveCollateral<'info> {
 
     #[account(
         mut,
-        constraint = receiving_account.mint == custody.mint,
+        constraint = receiving_account.mint == lock_custody.mint,
         has_one = owner
     )]
     pub receiving_account: Box<Account<'info, TokenAccount>>,
@@ -77,12 +77,27 @@ pub struct RemoveCollateral<'info> {
 
     #[account(
         mut,
+        seeds = [b"custody",
+                 pool.key().as_ref(),
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.bump
+    )]
+    pub lock_custody: Box<Account<'info, Custody>>,
+
+    /// CHECK: oracle account for the collateral token
+    #[account(
+        constraint = lock_custody_oracle_account.key() == lock_custody.oracle.oracle_account
+    )]
+    pub lock_custody_oracle_account: AccountInfo<'info>,
+
+    #[account(
+        mut,
         seeds = [b"custody_token_account",
                  pool.key().as_ref(),
-                 custody.mint.as_ref()],
-        bump = custody.token_account_bump
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.token_account_bump
     )]
-    pub custody_token_account: Box<Account<'info, TokenAccount>>,
+    pub lock_custody_token_account: Box<Account<'info, TokenAccount>>,
 
     token_program: Program<'info, Token>,
 }
@@ -100,6 +115,7 @@ pub fn remove_collateral(
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
     let custody = ctx.accounts.custody.as_mut();
+    let lock_custody = ctx.accounts.lock_custody.as_mut();
     require!(
         perpetuals.permissions.allow_collateral_withdrawal
             && custody.permissions.allow_collateral_withdrawal,
@@ -134,9 +150,17 @@ pub fn remove_collateral(
         curtime,
     )?;
 
+    let lock_token_price = OraclePrice::new_from_oracle(
+        lock_custody.oracle.oracle_type,
+        &ctx.accounts.lock_custody_oracle_account.to_account_info(),
+        lock_custody.oracle.max_price_error,
+        lock_custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+
     // compute fee
-    let collateral = token_price.get_token_amount(params.collateral_usd, custody.decimals)?;
-    let fee_amount = pool.get_remove_liquidity_fee(token_id, collateral, custody, &token_price)?;
+    let collateral = lock_token_price.get_token_amount(params.collateral_usd, lock_custody.decimals)?;
+    let fee_amount = pool.get_remove_liquidity_fee(pool.get_token_id(&lock_custody.key())?, collateral, lock_custody, &lock_token_price)?;
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
@@ -151,7 +175,7 @@ pub fn remove_collateral(
     let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     let withdrawal_amount = math::checked_add(transfer_amount, protocol_fee)?;
     require!(
-        pool.check_token_ratio(token_id, 0, withdrawal_amount, custody, &token_price)?,
+        pool.check_token_ratio(pool.get_token_id(&lock_custody.key())?, 0, withdrawal_amount, lock_custody, &lock_token_price)?,
         PerpetualsError::TokenRatioOutOfRange
     );
 
@@ -178,7 +202,7 @@ pub fn remove_collateral(
     // transfer tokens
     msg!("Transfer tokens");
     perpetuals.transfer_tokens(
-        ctx.accounts.custody_token_account.to_account_info(),
+        ctx.accounts.lock_custody_token_account.to_account_info(),
         ctx.accounts.receiving_account.to_account_info(),
         ctx.accounts.transfer_authority.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
@@ -187,13 +211,13 @@ pub fn remove_collateral(
 
     // update custody stats
     msg!("Update custody stats");
-    custody.collected_fees.open_position_usd = custody
+    lock_custody.collected_fees.open_position_usd = lock_custody
         .collected_fees
         .open_position_usd
-        .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+        .wrapping_add(lock_token_price.get_asset_amount_usd(fee_amount, lock_custody.decimals)?);
 
-    custody.assets.collateral = math::checked_sub(custody.assets.collateral, collateral)?;
-    custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
+    lock_custody.assets.collateral = math::checked_sub(lock_custody.assets.collateral, collateral)?;
+    lock_custody.assets.protocol_fees = math::checked_add(lock_custody.assets.protocol_fees, protocol_fee)?;
 
     Ok(())
 }

@@ -23,14 +23,14 @@ pub struct Liquidate<'info> {
 
     #[account(
         mut,
-        constraint = receiving_account.mint == custody.mint,
+        constraint = receiving_account.mint == lock_custody.mint,
         constraint = receiving_account.owner == position.owner
     )]
     pub receiving_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
-        constraint = rewards_receiving_account.mint == custody.mint,
+        constraint = rewards_receiving_account.mint == lock_custody.mint,
         constraint = rewards_receiving_account.owner == signer.key()
     )]
     pub rewards_receiving_account: Box<Account<'info, TokenAccount>>,
@@ -92,6 +92,30 @@ pub struct Liquidate<'info> {
     )]
     pub custody_token_account: Box<Account<'info, TokenAccount>>,
 
+    #[account(
+        mut,
+        seeds = [b"custody",
+                 pool.key().as_ref(),
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.bump
+    )]
+    pub lock_custody: Box<Account<'info, Custody>>,
+
+    /// CHECK: oracle account for the collateral token
+    #[account(
+        constraint = lock_custody_oracle_account.key() == lock_custody.oracle.oracle_account
+    )]
+    pub lock_custody_oracle_account: AccountInfo<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"custody_token_account",
+                 pool.key().as_ref(),
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.token_account_bump
+    )]
+    pub lock_custody_token_account: Box<Account<'info, TokenAccount>>,
+
     token_program: Program<'info, Token>,
 }
 
@@ -103,6 +127,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
     let custody = ctx.accounts.custody.as_mut();
+    let lock_custody = ctx.accounts.lock_custody.as_mut();
     require!(
         perpetuals.permissions.allow_close_position && custody.permissions.allow_close_position,
         PerpetualsError::InstructionNotAllowed
@@ -132,6 +157,14 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         curtime,
     )?;
 
+    let lock_token_price = OraclePrice::new_from_oracle(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+
     require!(
         !pool.check_leverage(
             token_id,
@@ -150,7 +183,9 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         position,
         &token_price,
         &token_ema_price,
+        &lock_token_price,
         custody,
+        lock_custody,
         position.size_usd,
         true,
     )?;
@@ -160,26 +195,26 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
     msg!("Net profit: {}, loss: {}", profit_usd, loss_usd);
     msg!("Collected fee: {}", fee_amount);
 
-    let reward = Pool::get_fee_amount(custody.fees.liquidation, total_amount_out)?;
+    let reward = Pool::get_fee_amount(lock_custody.fees.liquidation, total_amount_out)?;
     let user_amount = math::checked_sub(total_amount_out, reward)?;
 
     msg!("Amount out: {}", user_amount);
     msg!("Reward: {}", reward);
 
     // unlock pool funds
-    pool.unlock_funds(position.locked_amount, custody)?;
+    pool.unlock_funds(position.locked_amount, lock_custody)?;
 
     // check pool constraints
     msg!("Check pool constraints");
     require!(
-        pool.check_available_amount(total_amount_out, custody)?,
+        pool.check_available_amount(total_amount_out, lock_custody)?,
         PerpetualsError::PoolAmountLimit
     );
 
     // transfer tokens
     msg!("Transfer tokens");
     perpetuals.transfer_tokens(
-        ctx.accounts.custody_token_account.to_account_info(),
+        ctx.accounts.lock_custody_token_account.to_account_info(),
         ctx.accounts.receiving_account.to_account_info(),
         ctx.accounts.transfer_authority.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
@@ -187,7 +222,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
     )?;
 
     perpetuals.transfer_tokens(
-        ctx.accounts.custody_token_account.to_account_info(),
+        ctx.accounts.lock_custody_token_account.to_account_info(),
         ctx.accounts.rewards_receiving_account.to_account_info(),
         ctx.accounts.transfer_authority.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
@@ -205,9 +240,9 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         math::checked_add(custody.volume_stats.liquidation_usd, position.size_usd)?;
 
     let amount_lost = total_amount_out.saturating_sub(position.collateral_amount);
-    custody.assets.owned = math::checked_sub(custody.assets.owned, amount_lost)?;
-    custody.assets.collateral =
-        math::checked_sub(custody.assets.collateral, position.collateral_amount)?;
+    lock_custody.assets.owned = math::checked_sub(lock_custody.assets.owned, amount_lost)?;
+    lock_custody.assets.collateral =
+        math::checked_sub(lock_custody.assets.collateral, position.collateral_amount)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     if position.side == Side::Long {

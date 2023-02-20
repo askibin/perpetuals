@@ -77,12 +77,27 @@ pub struct AddCollateral<'info> {
 
     #[account(
         mut,
+        seeds = [b"custody",
+                 pool.key().as_ref(),
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.bump
+    )]
+    pub lock_custody: Box<Account<'info, Custody>>,
+
+    /// CHECK: oracle account for the collateral token
+    #[account(
+        constraint = lock_custody_oracle_account.key() == lock_custody.oracle.oracle_account
+    )]
+    pub lock_custody_oracle_account: AccountInfo<'info>,
+
+    #[account(
+        mut,
         seeds = [b"custody_token_account",
                  pool.key().as_ref(),
-                 custody.mint.as_ref()],
-        bump = custody.token_account_bump
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.token_account_bump
     )]
-    pub custody_token_account: Box<Account<'info, TokenAccount>>,
+    pub lock_custody_token_account: Box<Account<'info, TokenAccount>>,
 
     token_program: Program<'info, Token>,
 }
@@ -100,9 +115,13 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     }
     let perpetuals = ctx.accounts.perpetuals.as_mut();
     let custody = ctx.accounts.custody.as_mut();
+    let lock_custody = ctx.accounts.lock_custody.as_mut();
     let position = ctx.accounts.position.as_mut();
     let pool = ctx.accounts.pool.as_mut();
     let token_id = pool.get_token_id(&custody.key())?;
+    if lock_custody.key() != position.lock_custody {
+        return Err(ProgramError::InvalidArgument.into());
+    }
 
     // compute position price
     let curtime = perpetuals.get_time()?;
@@ -123,14 +142,36 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
         curtime,
     )?;
 
+    let lock_token_price = OraclePrice::new_from_oracle(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+
+    let lock_token_ema_price = OraclePrice::new_from_oracle_ema(
+        custody.oracle.oracle_type,
+        &ctx.accounts.custody_oracle_account.to_account_info(),
+        custody.oracle.max_price_error,
+        custody.oracle.max_price_age_sec,
+        curtime,
+    )?;
+
+    let lock_price = if lock_token_price < lock_token_ema_price {
+        lock_token_price
+    } else {
+        lock_token_ema_price
+    };
+
     // compute fee
     let fee_amount =
-        pool.get_add_liquidity_fee(token_id, params.collateral, custody, &token_price)?;
+        pool.get_add_liquidity_fee(pool.get_token_id(&lock_custody.key())?, params.collateral, lock_custody, &lock_price)?;
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
     let transfer_amount = math::checked_add(params.collateral, fee_amount)?;
-    let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
+    let collateral_usd = lock_token_price.get_asset_amount_usd(params.collateral, lock_custody.decimals)?;
     msg!("Amount in: {}", transfer_amount);
     msg!("Collateral added in USD: {}", collateral_usd);
 
@@ -167,7 +208,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     msg!("Transfer tokens");
     perpetuals.transfer_tokens_from_user(
         ctx.accounts.funding_account.to_account_info(),
-        ctx.accounts.custody_token_account.to_account_info(),
+        ctx.accounts.lock_custody_token_account.to_account_info(),
         ctx.accounts.owner.to_account_info(),
         ctx.accounts.token_program.to_account_info(),
         transfer_amount,
@@ -175,13 +216,13 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
 
     // update custody stats
     msg!("Update custody stats");
-    custody.collected_fees.open_position_usd = custody
+    lock_custody.collected_fees.open_position_usd = lock_custody
         .collected_fees
         .open_position_usd
-        .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+        .wrapping_add(lock_token_price.get_asset_amount_usd(fee_amount, lock_custody.decimals)?);
 
-    custody.assets.collateral = math::checked_add(custody.assets.collateral, params.collateral)?;
-    custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
+    lock_custody.assets.collateral = math::checked_add(lock_custody.assets.collateral, params.collateral)?;
+    lock_custody.assets.protocol_fees = math::checked_add(lock_custody.assets.protocol_fees, protocol_fee)?;
 
     Ok(())
 }
