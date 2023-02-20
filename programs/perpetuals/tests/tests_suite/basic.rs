@@ -5,11 +5,9 @@ use crate::{
     },
     utils::{
         add_perpetuals_program, create_and_fund_multiple_accounts, find_associated_token_account,
-        get_account, get_current_unix_timestamp, get_test_oracle_account,
+        get_current_unix_timestamp, get_test_oracle_account,
     },
 };
-use anchor_lang::prelude::{AccountMeta, Pubkey};
-use anchor_spl::token::{spl_token, Mint};
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{AddCustodyParams, AddLiquidityParams, InitParams, SetTestOraclePriceParams},
@@ -19,9 +17,8 @@ use perpetuals::{
         perpetuals::Permissions,
     },
 };
-use solana_program::{instruction::Instruction, sysvar};
 use solana_program_test::ProgramTest;
-use solana_sdk::signer::{keypair::Keypair, Signer};
+use solana_sdk::signer::Signer;
 
 // =============================================
 // ===> Keypair details
@@ -34,7 +31,7 @@ const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
 const USER_ALICE: usize = 6;
 // ==============================================
-const NB_KEYPAIR: usize = 7;
+const KEYPAIRS_COUNT: usize = 7;
 // ==============================================
 
 pub async fn basic_test_suite() {
@@ -44,7 +41,7 @@ pub async fn basic_test_suite() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
-    let keypairs = create_and_fund_multiple_accounts(&mut program_test, NB_KEYPAIR).await;
+    let keypairs = create_and_fund_multiple_accounts(&mut program_test, KEYPAIRS_COUNT).await;
 
     // Initialize the mints
     let usdc_mint = program_test
@@ -92,7 +89,7 @@ pub async fn basic_test_suite() {
 
     let pool_admin = &keypairs[MULTISIG_MEMBER_A];
 
-    let (pool_pda, _, lp_token_mint_pda, _) = test_add_pool(
+    let (pool_pda, _, _lp_token_mint_pda, _) = test_add_pool(
         &mut program_test_ctx,
         pool_admin,
         &keypairs[PAYER],
