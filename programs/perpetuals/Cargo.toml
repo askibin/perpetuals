@@ -30,7 +30,7 @@ overflow-checks = true
 [dependencies]
 anchor-lang = {version = "0.26.0", features = ["init-if-needed"]}
 anchor-spl = "0.26.0"
-solana-program = "1.14.1"
+solana-program = "1.14.13"
 solana-security-txt = "1.1.0"
 pyth-sdk-solana = "0.7.0"
 ahash = "=0.7.6"
