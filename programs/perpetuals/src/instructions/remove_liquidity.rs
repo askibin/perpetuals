@@ -92,7 +92,7 @@ pub struct RemoveLiquidity<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct RemoveLiquidityParams {
-    lp_amount: u64,
+    pub lp_amount: u64,
 }
 
 pub fn remove_liquidity(

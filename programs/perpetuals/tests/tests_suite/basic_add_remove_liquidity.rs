@@ -1,7 +1,7 @@
 use crate::{
     instructions::{
         test_add_custody, test_add_liquidity, test_add_pool, test_init::test_init,
-        test_set_test_oracle_price,
+        test_remove_liquidity, test_set_test_oracle_price,
     },
     utils::{
         add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
@@ -10,7 +10,10 @@ use crate::{
 };
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
-    instructions::{AddCustodyParams, AddLiquidityParams, InitParams, SetTestOraclePriceParams},
+    instructions::{
+        AddCustodyParams, AddLiquidityParams, InitParams, RemoveLiquidityParams,
+        SetTestOraclePriceParams,
+    },
     state::{
         custody::{Fees, FeesMode, OracleParams, PricingParams},
         oracle::OracleType,
@@ -30,7 +33,7 @@ const USER_ALICE: usize = 6;
 
 const KEYPAIRS_COUNT: usize = 7;
 
-pub async fn basic_add_liquidity_test_suite() {
+pub async fn basic_add_remove_liquidity_test_suite() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
@@ -182,7 +185,7 @@ pub async fn basic_add_liquidity_test_suite() {
     )
     .await;
 
-    initialize_token_account(
+    let alice_lp_token_account = initialize_token_account(
         &mut program_test_ctx,
         &lp_token_mint_pda,
         &keypairs[USER_ALICE].pubkey(),
@@ -200,7 +203,7 @@ pub async fn basic_add_liquidity_test_suite() {
         .await
         .unwrap();
 
-    // Add 1 USDC liquidity
+    // Add 1 USDC liquity
     test_add_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
@@ -208,6 +211,25 @@ pub async fn basic_add_liquidity_test_suite() {
         &pool_pda,
         &usdc_mint,
         AddLiquidityParams { amount: 1_000_000 },
+    )
+    .await;
+
+    let alice_lp_token_balance = program_test_ctx
+        .get_token_account(alice_lp_token_account)
+        .await
+        .unwrap()
+        .amount;
+
+    // Remove 100% of provided liquidity (1 USDC less fees)
+    test_remove_liquidity(
+        &mut program_test_ctx,
+        &keypairs[USER_ALICE],
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_mint,
+        RemoveLiquidityParams {
+            lp_amount: alice_lp_token_balance,
+        },
     )
     .await;
 }
