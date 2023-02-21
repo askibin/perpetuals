@@ -1,8 +1,10 @@
+use std::ops::{Div, Mul};
+
 use crate::{
     instructions::{
         test_add_custody, test_add_liquidity, test_add_pool, test_close_position,
         test_init::test_init, test_open_position, test_remove_liquidity,
-        test_set_test_oracle_price,
+        test_set_test_oracle_price, test_swap,
     },
     utils::{
         add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
@@ -13,7 +15,7 @@ use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{
         AddCustodyParams, AddLiquidityParams, ClosePositionParams, InitParams, OpenPositionParams,
-        RemoveLiquidityParams, SetTestOraclePriceParams,
+        RemoveLiquidityParams, SetTestOraclePriceParams, SwapParams,
     },
     state::{
         custody::{Fees, FeesMode, OracleParams, PricingParams},
@@ -33,8 +35,9 @@ const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
 const USER_ALICE: usize = 6;
 const USER_MARTIN: usize = 7;
+const USER_PAUL: usize = 8;
 
-const KEYPAIRS_COUNT: usize = 8;
+const KEYPAIRS_COUNT: usize = 9;
 
 pub async fn basic_interactions_test_suite() {
     let mut program_test = ProgramTest::default();
@@ -45,6 +48,9 @@ pub async fn basic_interactions_test_suite() {
     // Initialize mints
     let usdc_mint = program_test
         .add_mint(None, 6, &keypairs[ROOT_AUTHORITY].pubkey())
+        .0;
+    let eth_mint = program_test
+        .add_mint(None, 9, &keypairs[ROOT_AUTHORITY].pubkey())
         .0;
 
     // Deploy the perpetuals program onchain as upgradeable program
@@ -159,6 +165,7 @@ pub async fn basic_interactions_test_suite() {
     };
 
     let usdc_oracle_test_admin = &keypairs[MULTISIG_MEMBER_A];
+    let eth_oracle_test_admin = &keypairs[MULTISIG_MEMBER_B];
 
     let publish_time = get_current_unix_timestamp(&mut program_test_ctx).await;
 
@@ -239,7 +246,7 @@ pub async fn basic_interactions_test_suite() {
         .unwrap();
 
     // Martin: Open 50 USDC position
-    let (position_pda, position_bump) = test_open_position(
+    let position_pda = test_open_position(
         &mut program_test_ctx,
         &keypairs[USER_MARTIN],
         &keypairs[PAYER],
@@ -253,9 +260,10 @@ pub async fn basic_interactions_test_suite() {
             side: Side::Long,
         },
     )
-    .await;
+    .await
+    .0;
 
-    // Price set as 1.01 +- 0.01 (price increase of 1%)
+    // Usdc: Price set as 1.01 +- 0.01 (price increase of 1%)
     test_set_test_oracle_price(
         &mut program_test_ctx,
         usdc_oracle_test_admin,
@@ -284,6 +292,171 @@ pub async fn basic_interactions_test_suite() {
         ClosePositionParams {
             // lowest exit price paid (slippage implied)
             price: 999_900,
+        },
+    )
+    .await;
+
+    let eth_test_oracle_pda = get_test_oracle_account(&pool_pda, &eth_mint).0;
+
+    let eth_custody_pda = {
+        let add_custody_params = AddCustodyParams {
+            is_stable: true,
+            oracle: OracleParams {
+                oracle_account: eth_test_oracle_pda,
+                oracle_type: OracleType::Test,
+                max_price_error: 1_000_000,
+                max_price_age_sec: 30,
+            },
+            pricing: PricingParams {
+                use_ema: false,
+                trade_spread_long: 100,
+                trade_spread_short: 100,
+                swap_spread: 200,
+                min_initial_leverage: 10_000,
+                max_leverage: 1_000_000,
+                max_payoff_mult: 10,
+            },
+            permissions: Permissions {
+                allow_swap: true,
+                allow_add_liquidity: true,
+                allow_remove_liquidity: true,
+                allow_open_position: true,
+                allow_close_position: true,
+                allow_pnl_withdrawal: true,
+                allow_collateral_withdrawal: true,
+                allow_size_change: true,
+            },
+            fees: Fees {
+                mode: FeesMode::Linear,
+                max_increase: 20_000,
+                max_decrease: 5_000,
+                swap: 100,
+                add_liquidity: 100,
+                remove_liquidity: 100,
+                open_position: 100,
+                close_position: 100,
+                liquidation: 100,
+                protocol_share: 10,
+            },
+            // TODO: explain
+            target_ratio: 10_000,
+            min_ratio: 0,
+            max_ratio: 1_000_000,
+        };
+
+        let eth_custody_pda = test_add_custody(
+            &mut program_test_ctx,
+            pool_admin,
+            &keypairs[PAYER],
+            &pool_pda,
+            &eth_mint,
+            9,
+            add_custody_params,
+            multisig_signers,
+        )
+        .await
+        .0;
+
+        eth_custody_pda
+    };
+
+    // Eth: Price set as 1,676.04 +- 10
+    test_set_test_oracle_price(
+        &mut program_test_ctx,
+        eth_oracle_test_admin,
+        &keypairs[PAYER],
+        &pool_pda,
+        &eth_custody_pda,
+        &eth_test_oracle_pda,
+        SetTestOraclePriceParams {
+            price: 1_676_040_000_000,
+            expo: -9,
+            conf: 10_000_000_000,
+            publish_time,
+        },
+        multisig_signers,
+    )
+    .await;
+
+    // Martin: Initialize ETH and lp associated token accounts
+    let martin_eth_token_account = initialize_token_account(
+        &mut program_test_ctx,
+        &eth_mint,
+        &keypairs[USER_MARTIN].pubkey(),
+    )
+    .await;
+
+    let martin_lp_token_account = initialize_token_account(
+        &mut program_test_ctx,
+        &lp_token_mint_pda,
+        &keypairs[USER_MARTIN].pubkey(),
+    )
+    .await;
+
+    // Martin: Mint 2 ETH
+    program_test_ctx
+        .mint_tokens(
+            &keypairs[ROOT_AUTHORITY],
+            &eth_mint,
+            &martin_eth_token_account,
+            2_000_000_000,
+        )
+        .await
+        .unwrap();
+
+    // Martin: Add 1 ETH liquidity
+    test_add_liquidity(
+        &mut program_test_ctx,
+        &keypairs[USER_MARTIN],
+        &keypairs[PAYER],
+        &pool_pda,
+        &eth_mint,
+        AddLiquidityParams {
+            amount: 1_000_000_000,
+        },
+    )
+    .await;
+
+    // Paul: Initialize USDC and ETH accounts
+    let paul_usdc_token_account = initialize_token_account(
+        &mut program_test_ctx,
+        &usdc_mint,
+        &keypairs[USER_PAUL].pubkey(),
+    )
+    .await;
+
+    let paul_eth_token_account = initialize_token_account(
+        &mut program_test_ctx,
+        &eth_mint,
+        &keypairs[USER_PAUL].pubkey(),
+    )
+    .await;
+
+    // Paul: Mint 150 USDC
+    program_test_ctx
+        .mint_tokens(
+            &keypairs[ROOT_AUTHORITY],
+            &usdc_mint,
+            &paul_usdc_token_account,
+            150_000_000,
+        )
+        .await
+        .unwrap();
+
+    // Paul: Swap 150 USDC for ETH
+    test_swap(
+        &mut program_test_ctx,
+        &keypairs[USER_PAUL],
+        &keypairs[PAYER],
+        &pool_pda,
+        &eth_mint,
+        // The program receives USDC
+        &usdc_mint,
+        SwapParams {
+            amount_in: 150_000_000,
+
+            // 1% slippage
+            min_amount_out: 150_000_000 / 1_676_040_000 * 99 / 100,
         },
     )
     .await;

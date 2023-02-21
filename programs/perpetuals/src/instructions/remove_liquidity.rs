@@ -154,6 +154,10 @@ pub fn remove_liquidity(
         pool.check_token_ratio(token_id, 0, withdrawal_amount, custody, &token_price)?,
         PerpetualsError::TokenRatioOutOfRange
     );
+
+    msg!("CUSTODY_ASSETS_OWNED: {}", custody.assets.owned);
+    msg!("CUSTODY_ASSETS_LOCKED: {}", custody.assets.locked);
+    msg!("WITHDRAWAL_AMOUNT: {}", withdrawal_amount);
     require!(
         math::checked_sub(custody.assets.owned, custody.assets.locked)? >= withdrawal_amount,
         PerpetualsError::PoolAmountLimit
