@@ -1,7 +1,8 @@
 use crate::{
     instructions::{
-        test_add_custody, test_add_liquidity, test_add_pool, test_init::test_init,
-        test_open_position, test_remove_liquidity, test_set_test_oracle_price,
+        test_add_custody, test_add_liquidity, test_add_pool, test_close_position,
+        test_init::test_init, test_open_position, test_remove_liquidity,
+        test_set_test_oracle_price,
     },
     utils::{
         add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
@@ -11,13 +12,14 @@ use crate::{
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{
-        AddCustodyParams, AddLiquidityParams, InitParams, OpenPositionParams,
+        AddCustodyParams, AddLiquidityParams, ClosePositionParams, InitParams, OpenPositionParams,
         RemoveLiquidityParams, SetTestOraclePriceParams,
     },
     state::{
         custody::{Fees, FeesMode, OracleParams, PricingParams},
         oracle::OracleType,
-        perpetuals::Permissions, position::Side,
+        perpetuals::Permissions,
+        position::Side,
     },
 };
 use solana_program_test::ProgramTest;
@@ -237,7 +239,7 @@ pub async fn basic_interactions_test_suite() {
         .unwrap();
 
     // Martin: Open 50 USDC position
-    test_open_position(
+    let (position_pda, position_bump) = test_open_position(
         &mut program_test_ctx,
         &keypairs[USER_MARTIN],
         &keypairs[PAYER],
@@ -253,7 +255,38 @@ pub async fn basic_interactions_test_suite() {
     )
     .await;
 
-    // Martin: Close his position
+    // Price set as 1.01 +- 0.01 (price increase of 1%)
+    test_set_test_oracle_price(
+        &mut program_test_ctx,
+        usdc_oracle_test_admin,
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_custody_pda,
+        &usdc_test_oracle_pda,
+        SetTestOraclePriceParams {
+            price: 1_010_000,
+            expo: -6,
+            conf: 10_000,
+            publish_time,
+        },
+        multisig_signers,
+    )
+    .await;
+
+    // Martin: Close the 50 USDC position with profit
+    test_close_position(
+        &mut program_test_ctx,
+        &keypairs[USER_MARTIN],
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_mint,
+        &position_pda,
+        ClosePositionParams {
+            // lowest exit price paid (slippage implied)
+            price: 999_900,
+        },
+    )
+    .await;
 
     let alice_lp_token_balance = program_test_ctx
         .get_token_account(alice_lp_token_account)
