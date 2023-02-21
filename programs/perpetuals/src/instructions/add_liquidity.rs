@@ -184,8 +184,6 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
 
     // update custody stats
     msg!("Update custody stats");
-    custody.update_borrow_rate(curtime)?;
-
     custody.collected_fees.add_liquidity_usd = custody
         .collected_fees
         .add_liquidity_usd
@@ -199,6 +197,8 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     custody.assets.owned = math::checked_add(custody.assets.owned, deposit_amount)?;
+
+    custody.update_borrow_rate(curtime)?;
 
     // update pool stats
     msg!("Update pool stats");

@@ -198,7 +198,6 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
 
     // update custody stats
     msg!("Update custody stats");
-    custody.update_borrow_rate(curtime)?;
     custody.collected_fees.liquidation_usd = custody
         .collected_fees
         .liquidation_usd
@@ -227,6 +226,8 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
 
     custody.trade_stats.profit_usd = custody.trade_stats.profit_usd.wrapping_add(profit_usd);
     custody.trade_stats.loss_usd = custody.trade_stats.loss_usd.wrapping_add(loss_usd);
+
+    custody.update_borrow_rate(curtime)?;
 
     Ok(())
 }

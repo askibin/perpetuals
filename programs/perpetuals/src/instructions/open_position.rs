@@ -241,7 +241,6 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
 
     // update custody stats
     msg!("Update custody stats");
-    custody.update_borrow_rate(curtime)?;
     custody.collected_fees.open_position_usd = custody
         .collected_fees
         .open_position_usd
@@ -262,6 +261,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         custody.trade_stats.oi_short_usd =
             math::checked_add(custody.trade_stats.oi_short_usd, size_usd)?;
     }
+
+    custody.update_borrow_rate(curtime)?;
 
     Ok(())
 }
