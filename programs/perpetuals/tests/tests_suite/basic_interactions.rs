@@ -1,14 +1,4 @@
-use crate::{
-    instructions::{
-        test_add_custody, test_add_liquidity, test_add_pool, test_close_position,
-        test_init::test_init, test_open_position, test_remove_liquidity,
-        test_set_test_oracle_price, test_swap,
-    },
-    utils::{
-        add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
-        get_test_oracle_account, initialize_token_account,
-    },
-};
+use crate::{instructions, utils};
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{
@@ -41,7 +31,8 @@ pub async fn basic_interactions_test_suite() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
-    let keypairs = create_and_fund_multiple_accounts(&mut program_test, KEYPAIRS_COUNT).await;
+    let keypairs =
+        utils::create_and_fund_multiple_accounts(&mut program_test, KEYPAIRS_COUNT).await;
 
     // Initialize mints
     let usdc_mint = program_test
@@ -52,7 +43,7 @@ pub async fn basic_interactions_test_suite() {
         .0;
 
     // Deploy the perpetuals program onchain as upgradeable program
-    add_perpetuals_program(&mut program_test, &keypairs[PERPETUALS_UPGRADE_AUTHORITY]).await;
+    utils::add_perpetuals_program(&mut program_test, &keypairs[PERPETUALS_UPGRADE_AUTHORITY]).await;
 
     // Start the client and connect to localnet validator
     let mut program_test_ctx = program_test.start_with_context().await;
@@ -78,7 +69,7 @@ pub async fn basic_interactions_test_suite() {
             allow_size_change: true,
         };
 
-        test_init(
+        instructions::test_init(
             &mut program_test_ctx,
             upgrade_authority,
             init_params,
@@ -89,7 +80,7 @@ pub async fn basic_interactions_test_suite() {
 
     let pool_admin = &keypairs[MULTISIG_MEMBER_A];
 
-    let (pool_pda, _, lp_token_mint_pda, _) = test_add_pool(
+    let (pool_pda, _, lp_token_mint_pda, _) = instructions::test_add_pool(
         &mut program_test_ctx,
         pool_admin,
         &keypairs[PAYER],
@@ -98,7 +89,7 @@ pub async fn basic_interactions_test_suite() {
     )
     .await;
 
-    let usdc_test_oracle_pda = get_test_oracle_account(&pool_pda, &usdc_mint).0;
+    let usdc_test_oracle_pda = utils::get_test_oracle_account(&pool_pda, &usdc_mint).0;
 
     let usdc_custody_pda = {
         let add_custody_params = AddCustodyParams {
@@ -146,7 +137,7 @@ pub async fn basic_interactions_test_suite() {
             max_ratio: 10_000,
         };
 
-        let usdc_custody_pda = test_add_custody(
+        let usdc_custody_pda = instructions::test_add_custody(
             &mut program_test_ctx,
             pool_admin,
             &keypairs[PAYER],
@@ -165,10 +156,10 @@ pub async fn basic_interactions_test_suite() {
     let usdc_oracle_test_admin = &keypairs[MULTISIG_MEMBER_A];
     let eth_oracle_test_admin = &keypairs[MULTISIG_MEMBER_B];
 
-    let publish_time = get_current_unix_timestamp(&mut program_test_ctx).await;
+    let publish_time = utils::get_current_unix_timestamp(&mut program_test_ctx).await;
 
     // Price set as 1 +- 0.01
-    test_set_test_oracle_price(
+    instructions::test_set_test_oracle_price(
         &mut program_test_ctx,
         usdc_oracle_test_admin,
         &keypairs[PAYER],
@@ -186,14 +177,14 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Alice: Initialize usdc and lp token associated token accounts
-    let alice_usdc_token_account = initialize_token_account(
+    let alice_usdc_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &usdc_mint,
         &keypairs[USER_ALICE].pubkey(),
     )
     .await;
 
-    let alice_lp_token_account = initialize_token_account(
+    let alice_lp_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &lp_token_mint_pda,
         &keypairs[USER_ALICE].pubkey(),
@@ -201,18 +192,17 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Alice: Mint 1k USDC
-    program_test_ctx
-        .mint_tokens(
-            &keypairs[ROOT_AUTHORITY],
-            &usdc_mint,
-            &alice_usdc_token_account,
-            1_000_000_000,
-        )
-        .await
-        .unwrap();
+    utils::mint_tokens(
+        &mut program_test_ctx,
+        &keypairs[ROOT_AUTHORITY],
+        &usdc_mint,
+        &alice_usdc_token_account,
+        1_000_000_000,
+    )
+    .await;
 
     // Alice: Add 1k USDC liquidity
-    test_add_liquidity(
+    instructions::test_add_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
         &keypairs[PAYER],
@@ -225,7 +215,7 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Martin: Initialize usdc associated token account
-    let martin_usdc_token_account = initialize_token_account(
+    let martin_usdc_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &usdc_mint,
         &keypairs[USER_MARTIN].pubkey(),
@@ -233,18 +223,17 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Martin: Mint 100 USDC
-    program_test_ctx
-        .mint_tokens(
-            &keypairs[ROOT_AUTHORITY],
-            &usdc_mint,
-            &martin_usdc_token_account,
-            100_000_000,
-        )
-        .await
-        .unwrap();
+    utils::mint_tokens(
+        &mut program_test_ctx,
+        &keypairs[ROOT_AUTHORITY],
+        &usdc_mint,
+        &martin_usdc_token_account,
+        100_000_000,
+    )
+    .await;
 
     // Martin: Open 50 USDC position
-    let position_pda = test_open_position(
+    let position_pda = instructions::test_open_position(
         &mut program_test_ctx,
         &keypairs[USER_MARTIN],
         &keypairs[PAYER],
@@ -262,7 +251,7 @@ pub async fn basic_interactions_test_suite() {
     .0;
 
     // Usdc: Price set as 1.01 +- 0.01 (price increase of 1%)
-    test_set_test_oracle_price(
+    instructions::test_set_test_oracle_price(
         &mut program_test_ctx,
         usdc_oracle_test_admin,
         &keypairs[PAYER],
@@ -280,7 +269,7 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Martin: Close the 50 USDC position with profit
-    test_close_position(
+    instructions::test_close_position(
         &mut program_test_ctx,
         &keypairs[USER_MARTIN],
         &keypairs[PAYER],
@@ -294,7 +283,7 @@ pub async fn basic_interactions_test_suite() {
     )
     .await;
 
-    let eth_test_oracle_pda = get_test_oracle_account(&pool_pda, &eth_mint).0;
+    let eth_test_oracle_pda = utils::get_test_oracle_account(&pool_pda, &eth_mint).0;
 
     let eth_custody_pda = {
         let add_custody_params = AddCustodyParams {
@@ -342,7 +331,7 @@ pub async fn basic_interactions_test_suite() {
             max_ratio: 1_000_000,
         };
 
-        let eth_custody_pda = test_add_custody(
+        let eth_custody_pda = instructions::test_add_custody(
             &mut program_test_ctx,
             pool_admin,
             &keypairs[PAYER],
@@ -359,7 +348,7 @@ pub async fn basic_interactions_test_suite() {
     };
 
     // Eth: Price set as 1,676.04 +- 10
-    test_set_test_oracle_price(
+    instructions::test_set_test_oracle_price(
         &mut program_test_ctx,
         eth_oracle_test_admin,
         &keypairs[PAYER],
@@ -377,14 +366,14 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Martin: Initialize ETH and lp associated token accounts
-    let martin_eth_token_account = initialize_token_account(
+    let martin_eth_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &eth_mint,
         &keypairs[USER_MARTIN].pubkey(),
     )
     .await;
 
-    let _martin_lp_token_account = initialize_token_account(
+    let _martin_lp_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &lp_token_mint_pda,
         &keypairs[USER_MARTIN].pubkey(),
@@ -392,18 +381,17 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Martin: Mint 2 ETH
-    program_test_ctx
-        .mint_tokens(
-            &keypairs[ROOT_AUTHORITY],
-            &eth_mint,
-            &martin_eth_token_account,
-            2_000_000_000,
-        )
-        .await
-        .unwrap();
+    utils::mint_tokens(
+        &mut program_test_ctx,
+        &keypairs[ROOT_AUTHORITY],
+        &eth_mint,
+        &martin_eth_token_account,
+        2_000_000_000,
+    )
+    .await;
 
     // Martin: Add 1 ETH liquidity
-    test_add_liquidity(
+    instructions::test_add_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_MARTIN],
         &keypairs[PAYER],
@@ -416,14 +404,14 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Paul: Initialize USDC and ETH accounts
-    let paul_usdc_token_account = initialize_token_account(
+    let paul_usdc_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &usdc_mint,
         &keypairs[USER_PAUL].pubkey(),
     )
     .await;
 
-    let _paul_eth_token_account = initialize_token_account(
+    let _paul_eth_token_account = utils::initialize_token_account(
         &mut program_test_ctx,
         &eth_mint,
         &keypairs[USER_PAUL].pubkey(),
@@ -431,18 +419,17 @@ pub async fn basic_interactions_test_suite() {
     .await;
 
     // Paul: Mint 150 USDC
-    program_test_ctx
-        .mint_tokens(
-            &keypairs[ROOT_AUTHORITY],
-            &usdc_mint,
-            &paul_usdc_token_account,
-            150_000_000,
-        )
-        .await
-        .unwrap();
+    utils::mint_tokens(
+        &mut program_test_ctx,
+        &keypairs[ROOT_AUTHORITY],
+        &usdc_mint,
+        &paul_usdc_token_account,
+        150_000_000,
+    )
+    .await;
 
     // Paul: Swap 150 USDC for ETH
-    test_swap(
+    instructions::test_swap(
         &mut program_test_ctx,
         &keypairs[USER_PAUL],
         &keypairs[PAYER],
@@ -466,7 +453,7 @@ pub async fn basic_interactions_test_suite() {
         .amount;
 
     // Alice: Remove 100% of provided liquidity (1k USDC less fees)
-    test_remove_liquidity(
+    instructions::test_remove_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
         &keypairs[PAYER],

@@ -6,7 +6,7 @@ use perpetuals::{
 use solana_program_test::ProgramTestContext;
 use solana_sdk::signer::{keypair::Keypair, Signer};
 
-use crate::utils::{get_account, pda};
+use crate::utils::{self, pda};
 
 pub async fn test_init(
     program_test_ctx: &mut ProgramTestContext,
@@ -67,7 +67,8 @@ pub async fn test_init(
         .unwrap();
 
     // ==== THEN ==============================================================
-    let perpetuals_account = get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
+    let perpetuals_account =
+        utils::get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
 
     // Assert permissions
     {
@@ -92,7 +93,7 @@ pub async fn test_init(
     );
     assert_eq!(perpetuals_account.perpetuals_bump, perpetuals_bump);
 
-    let multisig_account = get_account::<Multisig>(program_test_ctx, multisig_pda).await;
+    let multisig_account = utils::get_account::<Multisig>(program_test_ctx, multisig_pda).await;
 
     // Assert multisig
     {

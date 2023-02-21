@@ -1,4 +1,4 @@
-use crate::utils::{find_associated_token_account, get_account, pda};
+use crate::utils::{self, pda};
 use anchor_lang::{
     prelude::{AccountMeta, Pubkey},
     InstructionData, ToAccountMetas,
@@ -30,11 +30,11 @@ pub async fn test_add_liquidity(
     let lp_token_mint_pda = pda::get_lp_token_mint_pda(&pool_pda).0;
 
     let funding_account_address =
-        find_associated_token_account(&owner.pubkey(), custody_token_mint).0;
+        utils::find_associated_token_account(&owner.pubkey(), custody_token_mint).0;
     let lp_token_account_address =
-        find_associated_token_account(&owner.pubkey(), &lp_token_mint_pda).0;
+        utils::find_associated_token_account(&owner.pubkey(), &lp_token_mint_pda).0;
 
-    let custody_account = get_account::<Custody>(program_test_ctx, custody_pda).await;
+    let custody_account = utils::get_account::<Custody>(program_test_ctx, custody_pda).await;
     let custody_oracle_account_address = custody_account.oracle.oracle_account;
 
     // Save account state before tx execution
@@ -68,7 +68,7 @@ pub async fn test_add_liquidity(
 
         let mut accounts_meta = accounts.to_account_metas(None);
 
-        let pool_account = get_account::<Pool>(program_test_ctx, *pool_pda).await;
+        let pool_account = utils::get_account::<Pool>(program_test_ctx, *pool_pda).await;
 
         // For each token, add custody account as remaining_account
         for token in pool_account.tokens.as_slice() {
@@ -81,7 +81,8 @@ pub async fn test_add_liquidity(
 
         // For each token, add custody oracle account as remaining_account
         for token in pool_account.tokens.as_slice() {
-            let custody_account = get_account::<Custody>(program_test_ctx, token.custody).await;
+            let custody_account =
+                utils::get_account::<Custody>(program_test_ctx, token.custody).await;
 
             accounts_meta.push(AccountMeta {
                 pubkey: custody_account.oracle.oracle_account,

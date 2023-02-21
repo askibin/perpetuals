@@ -69,6 +69,19 @@ pub async fn initialize_token_account(
         .unwrap()[0]
 }
 
+pub async fn mint_tokens(
+    program_test_ctx: &mut ProgramTestContext,
+    mint_authority: &Keypair,
+    mint: &Pubkey,
+    token_account: &Pubkey,
+    amount: u64,
+) {
+    program_test_ctx
+        .mint_tokens(mint_authority, mint, token_account, amount)
+        .await
+        .unwrap();
+}
+
 // Deploy the perpetuals program onchain as upgradeable program
 pub async fn add_perpetuals_program(program_test: &mut ProgramTest, upgrade_authority: &Keypair) {
     // Deploy two accounts, one describing the program

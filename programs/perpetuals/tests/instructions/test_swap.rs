@@ -1,4 +1,4 @@
-use crate::utils::{find_associated_token_account, get_account, pda};
+use crate::utils::{self, pda};
 use anchor_lang::{prelude::Pubkey, InstructionData, ToAccountMetas};
 use bonfida_test_utils::ProgramTestContextExt;
 use perpetuals::{instructions::SwapParams, state::custody::Custody};
@@ -28,17 +28,17 @@ pub async fn test_swap(
         pda::get_custody_token_account_pda(pool_pda, receiving_custody_token_mint).0;
 
     let funding_account_address =
-        find_associated_token_account(&owner.pubkey(), receiving_custody_token_mint).0;
+        utils::find_associated_token_account(&owner.pubkey(), receiving_custody_token_mint).0;
     let receiving_account_address =
-        find_associated_token_account(&owner.pubkey(), dispensing_custody_token_mint).0;
+        utils::find_associated_token_account(&owner.pubkey(), dispensing_custody_token_mint).0;
 
     let dispensing_custody_account =
-        get_account::<Custody>(program_test_ctx, dispensing_custody_pda).await;
+        utils::get_account::<Custody>(program_test_ctx, dispensing_custody_pda).await;
     let dispensing_custody_oracle_account_address =
         dispensing_custody_account.oracle.oracle_account;
 
     let receiving_custody_account =
-        get_account::<Custody>(program_test_ctx, receiving_custody_pda).await;
+        utils::get_account::<Custody>(program_test_ctx, receiving_custody_pda).await;
     let receiving_custody_oracle_account_address = receiving_custody_account.oracle.oracle_account;
 
     // Save account state before tx execution

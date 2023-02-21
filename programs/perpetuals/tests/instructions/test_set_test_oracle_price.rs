@@ -1,11 +1,12 @@
-use crate::{
-    utils::{get_account, pda},
-};
+use crate::utils::{self, pda};
 use anchor_lang::{
     prelude::{AccountMeta, Pubkey},
     InstructionData, ToAccountMetas,
 };
-use perpetuals::{instructions::SetTestOraclePriceParams, state::{multisig::Multisig, oracle::TestOracle}};
+use perpetuals::{
+    instructions::SetTestOraclePriceParams,
+    state::{multisig::Multisig, oracle::TestOracle},
+};
 use solana_program_test::ProgramTestContext;
 use solana_sdk::signer::{keypair::Keypair, Signer};
 
@@ -23,7 +24,7 @@ pub async fn test_set_test_oracle_price(
     let multisig_pda = pda::get_multisig_pda().0;
     let perpetuals_pda = pda::get_perpetuals_pda().0;
 
-    let multisig_account = get_account::<Multisig>(program_test_ctx, multisig_pda).await;
+    let multisig_account = utils::get_account::<Multisig>(program_test_ctx, multisig_pda).await;
 
     // One Tx per multisig signer
     for i in 0..multisig_account.min_signatures {
@@ -74,7 +75,7 @@ pub async fn test_set_test_oracle_price(
     }
 
     // ==== THEN ==============================================================
-    let test_oracle_account = get_account::<TestOracle>(program_test_ctx, *oracle_pda).await;
+    let test_oracle_account = utils::get_account::<TestOracle>(program_test_ctx, *oracle_pda).await;
 
     assert_eq!(test_oracle_account.price, params.price);
     assert_eq!(test_oracle_account.expo, params.expo);

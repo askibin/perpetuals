@@ -1,6 +1,4 @@
-use crate::{
-    utils::{get_account, pda},
-};
+use crate::utils::{self, pda};
 use anchor_lang::{
     prelude::{AccountMeta, Pubkey},
     InstructionData, ToAccountMetas,
@@ -30,7 +28,7 @@ pub async fn test_add_custody(
     let (custody_token_account_pda, custody_token_account_bump) =
         pda::get_custody_token_account_pda(pool_pda, custody_token_mint);
 
-    let multisig_account = get_account::<Multisig>(program_test_ctx, multisig_pda).await;
+    let multisig_account = utils::get_account::<Multisig>(program_test_ctx, multisig_pda).await;
 
     // One Tx per multisig signer
     for i in 0..multisig_account.min_signatures {
@@ -85,7 +83,7 @@ pub async fn test_add_custody(
     }
 
     // ==== THEN ==============================================================
-    let custody_account = get_account::<Custody>(program_test_ctx, custody_pda).await;
+    let custody_account = utils::get_account::<Custody>(program_test_ctx, custody_pda).await;
 
     // Check custody account
     {
@@ -105,7 +103,7 @@ pub async fn test_add_custody(
         );
     }
 
-    let pool_account = get_account::<Pool>(program_test_ctx, *pool_pda).await;
+    let pool_account = utils::get_account::<Pool>(program_test_ctx, *pool_pda).await;
 
     // Check pool token
     {

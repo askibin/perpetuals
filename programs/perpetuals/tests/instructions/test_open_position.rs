@@ -1,9 +1,9 @@
-use crate::utils::{find_associated_token_account, get_account, pda};
+use crate::utils::{self, pda};
 use anchor_lang::{prelude::Pubkey, InstructionData, ToAccountMetas};
 use bonfida_test_utils::ProgramTestContextExt;
 use perpetuals::{
     instructions::OpenPositionParams,
-    state::{custody::Custody, position::Position, perpetuals::Perpetuals},
+    state::{custody::Custody, perpetuals::Perpetuals, position::Position},
 };
 use solana_program_test::ProgramTestContext;
 use solana_sdk::signer::{keypair::Keypair, Signer};
@@ -29,9 +29,9 @@ pub async fn test_open_position(
         pda::get_position_pda(&owner.pubkey(), pool_pda, &custody_pda, params.side);
 
     let funding_account_address =
-        find_associated_token_account(&owner.pubkey(), custody_token_mint).0;
+        utils::find_associated_token_account(&owner.pubkey(), custody_token_mint).0;
 
-    let custody_account = get_account::<Custody>(program_test_ctx, custody_pda).await;
+    let custody_account = utils::get_account::<Custody>(program_test_ctx, custody_pda).await;
     let custody_oracle_account_address = custody_account.oracle.oracle_account;
 
     // Save account state before tx execution
@@ -101,19 +101,26 @@ pub async fn test_open_position(
 
     // Check the position
     {
-        let custody_account = get_account::<Custody>(program_test_ctx, custody_pda).await;
-        let position_account = get_account::<Position>(program_test_ctx, position_pda).await;
-        let perpetuals_account = get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
+        let custody_account = utils::get_account::<Custody>(program_test_ctx, custody_pda).await;
+        let position_account = utils::get_account::<Position>(program_test_ctx, position_pda).await;
+        let perpetuals_account =
+            utils::get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
 
         assert_eq!(position_account.owner, owner.pubkey());
         assert_eq!(position_account.pool, *pool_pda);
         assert_eq!(position_account.custody, custody_pda);
-        assert_eq!(position_account.open_time, perpetuals_account.inception_time);
+        assert_eq!(
+            position_account.open_time,
+            perpetuals_account.inception_time
+        );
         assert_eq!(position_account.update_time, 0);
         assert_eq!(position_account.side, params.side);
         assert_eq!(position_account.unrealized_profit_usd, 0);
         assert_eq!(position_account.unrealized_loss_usd, 0);
-        assert_eq!(position_account.borrow_rate_sum, custody_account.borrow_rate_sum);
+        assert_eq!(
+            position_account.borrow_rate_sum,
+            custody_account.borrow_rate_sum
+        );
         assert_eq!(position_account.collateral_amount, params.collateral);
         assert_eq!(position_account.bump, position_bump);
     }
