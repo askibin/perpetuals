@@ -1,3 +1,4 @@
+use perpetuals::state::position::Side;
 use solana_sdk::pubkey::Pubkey;
 
 pub fn get_multisig_pda() -> (Pubkey, u8) {
@@ -36,6 +37,24 @@ pub fn get_custody_pda(pool_pda: &Pubkey, custody_token_mint: &Pubkey) -> (Pubke
             "custody".as_ref(),
             pool_pda.as_ref(),
             custody_token_mint.as_ref(),
+        ],
+        &perpetuals::id(),
+    )
+}
+
+pub fn get_position_pda(
+    owner: &Pubkey,
+    pool_pda: &Pubkey,
+    custody_pda: &Pubkey,
+    side: Side,
+) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            "position".as_ref(),
+            owner.as_ref(),
+            pool_pda.as_ref(),
+            custody_pda.as_ref(),
+            &[side as u8],
         ],
         &perpetuals::id(),
     )

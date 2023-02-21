@@ -1,7 +1,7 @@
 use crate::{
     instructions::{
         test_add_custody, test_add_liquidity, test_add_pool, test_init::test_init,
-        test_remove_liquidity, test_set_test_oracle_price,
+        test_open_position, test_remove_liquidity, test_set_test_oracle_price,
     },
     utils::{
         add_perpetuals_program, create_and_fund_multiple_accounts, get_current_unix_timestamp,
@@ -11,13 +11,13 @@ use crate::{
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{
-        AddCustodyParams, AddLiquidityParams, InitParams, RemoveLiquidityParams,
-        SetTestOraclePriceParams,
+        AddCustodyParams, AddLiquidityParams, InitParams, OpenPositionParams,
+        RemoveLiquidityParams, SetTestOraclePriceParams,
     },
     state::{
         custody::{Fees, FeesMode, OracleParams, PricingParams},
         oracle::OracleType,
-        perpetuals::Permissions,
+        perpetuals::Permissions, position::Side,
     },
 };
 use solana_program_test::ProgramTest;
@@ -30,10 +30,11 @@ const MULTISIG_MEMBER_B: usize = 3;
 const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
 const USER_ALICE: usize = 6;
+const USER_MARTIN: usize = 7;
 
-const KEYPAIRS_COUNT: usize = 7;
+const KEYPAIRS_COUNT: usize = 8;
 
-pub async fn basic_add_remove_liquidity_test_suite() {
+pub async fn basic_interactions_test_suite() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
@@ -134,7 +135,7 @@ pub async fn basic_add_remove_liquidity_test_suite() {
                 protocol_share: 10,
             },
             // in BPS, 10_000 = 100%
-            target_ratio: 10_000,
+            target_ratio: 5_000,
             min_ratio: 0,
             max_ratio: 10_000,
         };
@@ -177,7 +178,7 @@ pub async fn basic_add_remove_liquidity_test_suite() {
     )
     .await;
 
-    // Initialize Alice usdc and lp token associated token accounts
+    // Alice: Initialize usdc and lp token associated token accounts
     let alice_usdc_token_account = initialize_token_account(
         &mut program_test_ctx,
         &usdc_mint,
@@ -192,27 +193,67 @@ pub async fn basic_add_remove_liquidity_test_suite() {
     )
     .await;
 
-    // Mint 10 USDC to Alice
+    // Alice: Mint 1k USDC
     program_test_ctx
         .mint_tokens(
             &keypairs[ROOT_AUTHORITY],
             &usdc_mint,
             &alice_usdc_token_account,
-            10_000_000,
+            1_000_000_000,
         )
         .await
         .unwrap();
 
-    // Add 1 USDC liquity
+    // Alice: Add 1k USDC liquidity
     test_add_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
         &keypairs[PAYER],
         &pool_pda,
         &usdc_mint,
-        AddLiquidityParams { amount: 1_000_000 },
+        AddLiquidityParams {
+            amount: 1_000_000_000,
+        },
     )
     .await;
+
+    // Martin: Initialize usdc associated token account
+    let martin_usdc_token_account = initialize_token_account(
+        &mut program_test_ctx,
+        &usdc_mint,
+        &keypairs[USER_MARTIN].pubkey(),
+    )
+    .await;
+
+    // Martin: Mint 100 USDC
+    program_test_ctx
+        .mint_tokens(
+            &keypairs[ROOT_AUTHORITY],
+            &usdc_mint,
+            &martin_usdc_token_account,
+            100_000_000,
+        )
+        .await
+        .unwrap();
+
+    // Martin: Open 50 USDC position
+    test_open_position(
+        &mut program_test_ctx,
+        &keypairs[USER_MARTIN],
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_mint,
+        OpenPositionParams {
+            // max price paid (slippage implied)
+            price: 1_050_000,
+            collateral: 50_000_000,
+            size: 50_000_000,
+            side: Side::Long,
+        },
+    )
+    .await;
+
+    // Martin: Close his position
 
     let alice_lp_token_balance = program_test_ctx
         .get_token_account(alice_lp_token_account)
@@ -220,7 +261,7 @@ pub async fn basic_add_remove_liquidity_test_suite() {
         .unwrap()
         .amount;
 
-    // Remove 100% of provided liquidity (1 USDC less fees)
+    // Alice: Remove 100% of provided liquidity (1k USDC less fees)
     test_remove_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
