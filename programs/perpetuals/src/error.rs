@@ -34,6 +34,8 @@ pub enum PerpetualsError {
     InvalidPerpetualsConfig,
     #[msg("Invalid custody config")]
     InvalidCustodyConfig,
+    #[msg("Invalid custody Account to lock")]
+    InvalidCustodyAccountToLock,
     #[msg("Insufficient token amount returned")]
     InsufficientAmountReturned,
     #[msg("Price slippage limit exceeded")]

@@ -168,9 +168,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
             position_price,
             PerpetualsError::MaxPriceSlippage
         );
-        if custody.key() != lock_custody.key() {
-            return Err(ProgramError::InvalidArgument.into());
-        }
+        require_keys_eq!(custody.key(), lock_custody.key());
             
         math::checked_div(
             math::checked_mul(params.size as u128, custody.pricing.max_payoff_mult as u128)?,
@@ -182,9 +180,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
             params.price,
             PerpetualsError::MaxPriceSlippage
         );
-        if lock_custody.is_stable {
-            return Err(ProgramError::InvalidArgument.into())
-        }
+        require!(lock_custody.is_stable, PerpetualsError::InvalidCustodyAccountToLock);
         let price = if token_price < token_ema_price {
             token_price
         } else {

@@ -94,7 +94,7 @@ impl Pool {
             lock_custody, 
             &token_price
         )?;
-        let mut index_size_fee = Pool::get_fee_amount(custody.fees.open_position, size)?;
+        let mut index_size_fee = Self::get_fee_amount(custody.fees.open_position, size)?;
         if custody.mint != lock_custody.mint {
             let index_size_fee_usd = token_price.get_asset_amount_usd(index_size_fee, custody.decimals)?;
             index_size_fee = token_price.get_token_amount(index_size_fee_usd, lock_custody.decimals)?;

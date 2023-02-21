@@ -119,9 +119,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     let position = ctx.accounts.position.as_mut();
     let pool = ctx.accounts.pool.as_mut();
     let token_id = pool.get_token_id(&custody.key())?;
-    if lock_custody.key() != position.lock_custody {
-        return Err(ProgramError::InvalidArgument.into());
-    }
+    require_keys_eq!(lock_custody.key(), position.lock_custody);
 
     // compute position price
     let curtime = perpetuals.get_time()?;
