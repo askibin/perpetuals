@@ -1,5 +1,3 @@
-use std::ops::{Div, Mul};
-
 use crate::{
     instructions::{
         test_add_custody, test_add_liquidity, test_add_pool, test_close_position,
@@ -386,7 +384,7 @@ pub async fn basic_interactions_test_suite() {
     )
     .await;
 
-    let martin_lp_token_account = initialize_token_account(
+    let _martin_lp_token_account = initialize_token_account(
         &mut program_test_ctx,
         &lp_token_mint_pda,
         &keypairs[USER_MARTIN].pubkey(),
@@ -425,7 +423,7 @@ pub async fn basic_interactions_test_suite() {
     )
     .await;
 
-    let paul_eth_token_account = initialize_token_account(
+    let _paul_eth_token_account = initialize_token_account(
         &mut program_test_ctx,
         &eth_mint,
         &keypairs[USER_PAUL].pubkey(),
