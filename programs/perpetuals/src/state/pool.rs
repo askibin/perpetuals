@@ -81,27 +81,21 @@ impl Pool {
         lock_custody: &Custody,
         token_price: &OraclePrice,
     ) -> Result<u64> {
-        // previous code
-        // let collateral_fee =
-        //     self.get_add_liquidity_fee(token_id, collateral, custody, token_price)?;
-        // let size_fee = Self::get_fee_amount(custody.fees.open_position, size)?;
 
-        // math::checked_add(collateral_fee, size_fee)
-
-        let deposit_collateral_fee = self.get_add_liquidity_fee(
+        let collateral_fee = self.get_add_liquidity_fee(
             token_id, 
             collateral, 
             lock_custody, 
             &token_price
         )?;
-        let mut index_size_fee = Self::get_fee_amount(custody.fees.open_position, size)?;
+        let mut size_fee = Self::get_fee_amount(custody.fees.open_position, size)?;
         if custody.mint != lock_custody.mint {
-            let index_size_fee_usd = token_price.get_asset_amount_usd(index_size_fee, custody.decimals)?;
-            index_size_fee = token_price.get_token_amount(index_size_fee_usd, lock_custody.decimals)?;
+            let size_fee_usd = token_price.get_asset_amount_usd(size_fee, custody.decimals)?;
+            size_fee = token_price.get_token_amount(size_fee_usd, lock_custody.decimals)?;
         }
         
         //fee_amount is calculated in lock_custody
-        math::checked_add(deposit_collateral_fee, index_size_fee)
+        math::checked_add(collateral_fee, size_fee)
     }
 
     pub fn get_exit_price(
