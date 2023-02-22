@@ -53,7 +53,7 @@ export class TestClient {
   constructor() {
     this.provider = anchor.AnchorProvider.env();
     anchor.setProvider(this.provider);
-    this.program = anchor.workspace.Perpetuals as Program<Perpetuals>;
+    this.program = anchor.workspace.Perpetuals as anchor.Program<Perpetuals>;
     this.printErrors = true;
 
     anchor.BN.prototype.toJSON = function () {
@@ -326,6 +326,10 @@ export class TestClient {
     }
     return res;
   };
+
+  getPositionLockCustody = async (positionAccount : PublicKey) => {
+    return (await this.program.account.position.fetch(positionAccount)).lockCustody;
+  }
 
   ///////
   // instructions
@@ -850,7 +854,8 @@ export class TestClient {
     user,
     fundingAccount: PublicKey,
     positionAccount: PublicKey,
-    custody
+    custody,
+    lockCustody
   ) => {
     try {
       await this.program.methods
@@ -869,7 +874,9 @@ export class TestClient {
           position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
-          custodyTokenAccount: custody.tokenAccount,
+          lockCustody: lockCustody.custody,
+          lockCustodyOracleAccount: lockCustody.oracleAccount,
+          lockCustodyTokenAccount: lockCustody.tokenAccount,
           systemProgram: SystemProgram.programId,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
@@ -888,8 +895,10 @@ export class TestClient {
     user,
     fundingAccount: PublicKey,
     positionAccount: PublicKey,
-    custody
+    custody,
+    lockCustody
   ) => {
+    // const lockCustody = this.getPositionLockCustody(positionAccount);
     try {
       await this.program.methods
         .addCollateral({
@@ -904,7 +913,9 @@ export class TestClient {
           position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
-          custodyTokenAccount: custody.tokenAccount,
+          lockCustody: lockCustody.custody,
+          lockCustodyOracleAccount: lockCustody.oracleAccount,
+          lockCustodyTokenAccount: lockCustody.tokenAccount,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
         .signers([user.wallet])
@@ -922,7 +933,8 @@ export class TestClient {
     user,
     receivingAccount: PublicKey,
     positionAccount: PublicKey,
-    custody
+    custody,
+    lockCustody
   ) => {
     try {
       await this.program.methods
@@ -938,7 +950,9 @@ export class TestClient {
           position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
-          custodyTokenAccount: custody.tokenAccount,
+          lockCustody: lockCustody.custody,
+          lockCustodyOracleAccount: lockCustody.oracleAccount,
+          lockCustodyTokenAccount: lockCustody.tokenAccount,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
         .signers([user.wallet])
@@ -956,7 +970,8 @@ export class TestClient {
     user,
     receivingAccount,
     positionAccount,
-    custody
+    custody,
+    lockCustody
   ) => {
     try {
       await this.program.methods
@@ -972,7 +987,9 @@ export class TestClient {
           position: positionAccount,
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
-          custodyTokenAccount: custody.tokenAccount,
+          lockCustody: lockCustody.custody,
+          lockCustodyOracleAccount: lockCustody.oracleAccount,
+          lockCustodyTokenAccount: lockCustody.tokenAccount,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
         .signers([user.wallet])
@@ -989,7 +1006,8 @@ export class TestClient {
     user,
     tokenAccount: PublicKey,
     positionAccount: PublicKey,
-    custody
+    custody,
+    lockCustody
   ) => {
     try {
       await this.program.methods
@@ -1005,6 +1023,9 @@ export class TestClient {
           custody: custody.custody,
           custodyOracleAccount: custody.oracleAccount,
           custodyTokenAccount: custody.tokenAccount,
+          lockCustody: lockCustody.custody,
+          lockCustodyOracleAccount: lockCustody.oracleAccount,
+          lockCustodyTokenAccount: lockCustody.tokenAccount,
           tokenProgram: spl.TOKEN_PROGRAM_ID,
         })
         .signers([user.wallet])
