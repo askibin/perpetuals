@@ -1,6 +1,6 @@
 use crate::{
     instructions,
-    utils::{self, dummy},
+    utils::{self, fixtures},
 };
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
@@ -57,7 +57,7 @@ pub async fn basic_interactions_test_suite() {
     instructions::test_init(
         &mut program_test_ctx,
         upgrade_authority,
-        dummy::init_params_permissions_full(1),
+        fixtures::init_params_permissions_full(1),
         multisig_signers,
     )
     .await;
@@ -78,10 +78,10 @@ pub async fn basic_interactions_test_suite() {
     let usdc_custody_pda = {
         let add_custody_params = AddCustodyParams {
             is_stable: true,
-            oracle: dummy::oracle_params_regular(usdc_test_oracle_pda),
-            pricing: dummy::pricing_params_regular(false),
-            permissions: dummy::permissions_full(),
-            fees: dummy::fees_linear_regular(),
+            oracle: fixtures::oracle_params_regular(usdc_test_oracle_pda),
+            pricing: fixtures::pricing_params_regular(false),
+            permissions: fixtures::permissions_full(),
+            fees: fixtures::fees_linear_regular(),
 
             // in BPS, 10_000 = 100%
             target_ratio: 5_000,
@@ -240,10 +240,11 @@ pub async fn basic_interactions_test_suite() {
     let eth_custody_pda = {
         let add_custody_params = AddCustodyParams {
             is_stable: false,
-            oracle: dummy::oracle_params_regular(eth_test_oracle_pda),
-            pricing: dummy::pricing_params_regular(false),
-            permissions: dummy::permissions_full(),
-            fees: dummy::fees_linear_regular(),
+            oracle: fixtures::oracle_params_regular(eth_test_oracle_pda),
+            pricing: fixtures::pricing_params_regular(false),
+            permissions: fixtures::permissions_full(),
+            fees: fixtures::fees_linear_regular(),
+
             // in BPS, 10_000 = 100%
             target_ratio: 5_000,
             min_ratio: 0,

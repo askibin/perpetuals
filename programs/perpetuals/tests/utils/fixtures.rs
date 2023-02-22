@@ -1,4 +1,4 @@
-// Contains dummy values usable in tests, made to reduce boilerplate
+// Contains fixtures values usable in tests, made to reduce boilerplate
 
 use anchor_lang::prelude::Pubkey;
 use perpetuals::{state::{

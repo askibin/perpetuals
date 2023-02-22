@@ -1,7 +1,7 @@
 pub mod pda;
 pub mod utils;
-pub mod dummy;
+pub mod fixtures;
 
 pub use pda::*;
 pub use utils::*;
-pub use dummy::*;
+pub use fixtures::*;
