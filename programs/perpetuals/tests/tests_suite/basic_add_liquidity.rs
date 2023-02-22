@@ -130,10 +130,10 @@ pub async fn basic_add_liquidity_test_suite() {
                 liquidation: 100,
                 protocol_share: 10,
             },
-            // Expressed in USD value
+            // in BPS, 10_000 = 100%
             target_ratio: 10_000,
             min_ratio: 0,
-            max_ratio: 100_000,
+            max_ratio: 10_000,
         };
 
         let usdc_custody_pda = test_add_custody(
