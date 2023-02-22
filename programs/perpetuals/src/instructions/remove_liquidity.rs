@@ -155,9 +155,6 @@ pub fn remove_liquidity(
         PerpetualsError::TokenRatioOutOfRange
     );
 
-    msg!("CUSTODY_ASSETS_OWNED: {}", custody.assets.owned);
-    msg!("CUSTODY_ASSETS_LOCKED: {}", custody.assets.locked);
-    msg!("WITHDRAWAL_AMOUNT: {}", withdrawal_amount);
     require!(
         math::checked_sub(custody.assets.owned, custody.assets.locked)? >= withdrawal_amount,
         PerpetualsError::PoolAmountLimit
@@ -203,7 +200,7 @@ pub fn remove_liquidity(
 
     // update pool stats
     msg!("Update pool stats");
-    pool.aum_usd = pool_amount_usd;
+    pool.aum_usd = pool_amount_usd.wrapping_sub(remove_amount_usd.into());
 
     Ok(())
 }

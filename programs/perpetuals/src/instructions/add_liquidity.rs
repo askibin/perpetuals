@@ -202,7 +202,11 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
 
     // update pool stats
     msg!("Update pool stats");
-    pool.aum_usd = pool_amount_usd;
+    pool.aum_usd = pool_amount_usd.wrapping_add(
+        token_price
+            .get_asset_amount_usd(params.amount, custody.decimals)?
+            .into(),
+    );
 
     Ok(())
 }
