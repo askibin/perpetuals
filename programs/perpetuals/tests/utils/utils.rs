@@ -1,8 +1,9 @@
 use std::path::Path;
 
 use anchor_lang::prelude::*;
+use anchor_spl::token::spl_token;
 use bonfida_test_utils::ProgramTestContextExt;
-use solana_program::{bpf_loader_upgradeable, stake_history::Epoch};
+use solana_program::{bpf_loader_upgradeable, stake_history::Epoch, program_pack::Pack};
 use solana_program_test::{read_file, ProgramTest, ProgramTestContext};
 use solana_sdk::{account, signature::Keypair, signer::Signer};
 
@@ -33,6 +34,18 @@ pub fn find_associated_token_account(owner: &Pubkey, mint: &Pubkey) -> (Pubkey, 
 
 pub fn copy_keypair(keypair: &Keypair) -> Keypair {
     Keypair::from_bytes(&keypair.to_bytes()).unwrap()
+}
+
+pub async fn get_token_account(
+    program_test_ctx: &mut ProgramTestContext,
+    key: Pubkey,
+) -> spl_token::state::Account {
+    let raw_account = program_test_ctx
+        .banks_client
+        .get_account(key)
+        .await.unwrap().unwrap();
+
+    spl_token::state::Account::unpack(&raw_account.data).unwrap()
 }
 
 pub async fn get_account<T: anchor_lang::AccountDeserialize>(

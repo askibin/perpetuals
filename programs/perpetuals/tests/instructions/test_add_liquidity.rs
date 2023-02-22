@@ -20,7 +20,6 @@ pub async fn test_add_liquidity(
     params: AddLiquidityParams,
 ) {
     // ==== WHEN ==============================================================
-
     // Prepare PDA and addresses
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
     let perpetuals_pda = pda::get_perpetuals_pda().0;
