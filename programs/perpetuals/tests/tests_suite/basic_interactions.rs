@@ -1,16 +1,14 @@
-use crate::{instructions, utils};
+use crate::{
+    instructions,
+    utils::{self, dummy},
+};
 use bonfida_test_utils::{ProgramTestContextExt, ProgramTestExt};
 use perpetuals::{
     instructions::{
-        AddCustodyParams, AddLiquidityParams, ClosePositionParams, InitParams, OpenPositionParams,
+        AddCustodyParams, AddLiquidityParams, ClosePositionParams, OpenPositionParams,
         RemoveLiquidityParams, SetTestOraclePriceParams, SwapParams,
     },
-    state::{
-        custody::{Fees, FeesMode, OracleParams, PricingParams},
-        oracle::OracleType,
-        perpetuals::Permissions,
-        position::Side,
-    },
+    state::position::Side,
 };
 use solana_program_test::ProgramTest;
 use solana_sdk::signer::Signer;
@@ -56,27 +54,13 @@ pub async fn basic_interactions_test_suite() {
         &keypairs[MULTISIG_MEMBER_C],
     ];
 
-    {
-        let init_params = InitParams {
-            min_signatures: 1,
-            allow_swap: true,
-            allow_add_liquidity: true,
-            allow_remove_liquidity: true,
-            allow_open_position: true,
-            allow_close_position: true,
-            allow_pnl_withdrawal: true,
-            allow_collateral_withdrawal: true,
-            allow_size_change: true,
-        };
-
-        instructions::test_init(
-            &mut program_test_ctx,
-            upgrade_authority,
-            init_params,
-            multisig_signers,
-        )
-        .await;
-    }
+    instructions::test_init(
+        &mut program_test_ctx,
+        upgrade_authority,
+        dummy::init_params_permissions_full(1),
+        multisig_signers,
+    )
+    .await;
 
     let pool_admin = &keypairs[MULTISIG_MEMBER_A];
 
@@ -94,43 +78,11 @@ pub async fn basic_interactions_test_suite() {
     let usdc_custody_pda = {
         let add_custody_params = AddCustodyParams {
             is_stable: true,
-            oracle: OracleParams {
-                oracle_account: usdc_test_oracle_pda,
-                oracle_type: OracleType::Test,
-                max_price_error: 1_000_000,
-                max_price_age_sec: 30,
-            },
-            pricing: PricingParams {
-                use_ema: false,
-                trade_spread_long: 100,
-                trade_spread_short: 100,
-                swap_spread: 200,
-                min_initial_leverage: 10_000,
-                max_leverage: 1_000_000,
-                max_payoff_mult: 10,
-            },
-            permissions: Permissions {
-                allow_swap: true,
-                allow_add_liquidity: true,
-                allow_remove_liquidity: true,
-                allow_open_position: true,
-                allow_close_position: true,
-                allow_pnl_withdrawal: true,
-                allow_collateral_withdrawal: true,
-                allow_size_change: true,
-            },
-            fees: Fees {
-                mode: FeesMode::Linear,
-                max_increase: 20_000,
-                max_decrease: 5_000,
-                swap: 100,
-                add_liquidity: 100,
-                remove_liquidity: 100,
-                open_position: 100,
-                close_position: 100,
-                liquidation: 100,
-                protocol_share: 10,
-            },
+            oracle: dummy::oracle_params_regular(usdc_test_oracle_pda),
+            pricing: dummy::pricing_params_regular(false),
+            permissions: dummy::permissions_full(),
+            fees: dummy::fees_linear_regular(),
+
             // in BPS, 10_000 = 100%
             target_ratio: 5_000,
             min_ratio: 0,
@@ -287,44 +239,11 @@ pub async fn basic_interactions_test_suite() {
 
     let eth_custody_pda = {
         let add_custody_params = AddCustodyParams {
-            is_stable: true,
-            oracle: OracleParams {
-                oracle_account: eth_test_oracle_pda,
-                oracle_type: OracleType::Test,
-                max_price_error: 1_000_000,
-                max_price_age_sec: 30,
-            },
-            pricing: PricingParams {
-                use_ema: false,
-                trade_spread_long: 100,
-                trade_spread_short: 100,
-                swap_spread: 200,
-                min_initial_leverage: 10_000,
-                max_leverage: 1_000_000,
-                max_payoff_mult: 10,
-            },
-            permissions: Permissions {
-                allow_swap: true,
-                allow_add_liquidity: true,
-                allow_remove_liquidity: true,
-                allow_open_position: true,
-                allow_close_position: true,
-                allow_pnl_withdrawal: true,
-                allow_collateral_withdrawal: true,
-                allow_size_change: true,
-            },
-            fees: Fees {
-                mode: FeesMode::Linear,
-                max_increase: 20_000,
-                max_decrease: 5_000,
-                swap: 100,
-                add_liquidity: 100,
-                remove_liquidity: 100,
-                open_position: 100,
-                close_position: 100,
-                liquidation: 100,
-                protocol_share: 10,
-            },
+            is_stable: false,
+            oracle: dummy::oracle_params_regular(eth_test_oracle_pda),
+            pricing: dummy::pricing_params_regular(false),
+            permissions: dummy::permissions_full(),
+            fees: dummy::fees_linear_regular(),
             // in BPS, 10_000 = 100%
             target_ratio: 5_000,
             min_ratio: 0,
