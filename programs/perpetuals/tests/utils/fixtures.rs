@@ -23,14 +23,14 @@ pub fn fees_linear_regular() -> Fees {
     Fees {
         mode: FeesMode::Linear,
         max_increase: 20_000,
-        max_decrease: 5_000,
+        max_decrease: 10_000,
         swap: 100,
-        add_liquidity: 100,
-        remove_liquidity: 100,
+        add_liquidity: 200,
+        remove_liquidity: 300,
         open_position: 100,
         close_position: 100,
-        liquidation: 100,
-        protocol_share: 10,
+        liquidation: 50,
+        protocol_share: 25,
     }
 }
 
@@ -39,10 +39,10 @@ pub fn pricing_params_regular(use_ema: bool) -> PricingParams {
         use_ema,
         trade_spread_long: 100,
         trade_spread_short: 100,
-        swap_spread: 200,
+        swap_spread: 300,
         min_initial_leverage: 10_000,
-        max_leverage: 1_000_000,
-        max_payoff_mult: 10,
+        max_leverage: 100_000,
+        max_payoff_mult: 10_000,
     }
 }
 
