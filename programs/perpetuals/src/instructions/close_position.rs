@@ -177,6 +177,7 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
         custody,
         lock_custody,
         position.size_usd,
+        curtime,
         false,
     )?;
 
@@ -238,6 +239,8 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
 
     custody.trade_stats.profit_usd = custody.trade_stats.profit_usd.wrapping_add(profit_usd);
     custody.trade_stats.loss_usd = custody.trade_stats.loss_usd.wrapping_add(loss_usd);
+
+    custody.update_borrow_rate(curtime)?;
 
     Ok(())
 }

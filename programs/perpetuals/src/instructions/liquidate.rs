@@ -172,6 +172,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
             &token_price,
             &token_ema_price,
             custody,
+            curtime,
             false
         )?,
         PerpetualsError::InvalidPositionState
@@ -187,6 +188,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         custody,
         lock_custody,
         position.size_usd,
+        curtime,
         true,
     )?;
 
@@ -259,6 +261,8 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
 
     custody.trade_stats.profit_usd = custody.trade_stats.profit_usd.wrapping_add(profit_usd);
     custody.trade_stats.loss_usd = custody.trade_stats.loss_usd.wrapping_add(loss_usd);
+
+    custody.update_borrow_rate(curtime)?;
 
     Ok(())
 }
