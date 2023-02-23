@@ -44,6 +44,14 @@ pub struct GetLiquidationState<'info> {
     )]
     pub custody: Box<Account<'info, Custody>>,
 
+    #[account(
+        seeds = [b"custody",
+                 pool.key().as_ref(),
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.bump
+    )]
+    pub lock_custody: Box<Account<'info, Custody>>,
+
     /// CHECK: oracle account for the collateral token
     #[account(
         constraint = custody_oracle_account.key() == custody.oracle.oracle_account
@@ -59,6 +67,7 @@ pub fn get_liquidation_state(
     _params: &GetLiquidationStateParams,
 ) -> Result<u8> {
     let custody = ctx.accounts.custody.as_mut();
+    let lock_custody = ctx.accounts.lock_custody.as_mut();
     let curtime = ctx.accounts.perpetuals.get_time()?;
 
     let token_price = OraclePrice::new_from_oracle(
@@ -83,6 +92,8 @@ pub fn get_liquidation_state(
         &token_price,
         &token_ema_price,
         custody,
+        lock_custody,
+        curtime,
         false,
     )? {
         Ok(0)

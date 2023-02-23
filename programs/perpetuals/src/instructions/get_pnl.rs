@@ -47,6 +47,14 @@ pub struct GetPnl<'info> {
     )]
     pub custody: Box<Account<'info, Custody>>,
 
+    #[account(
+        seeds = [b"custody",
+                 pool.key().as_ref(),
+                 lock_custody.mint.as_ref()],
+        bump = lock_custody.bump
+    )]
+    pub lock_custody: Box<Account<'info, Custody>>,
+
     /// CHECK: oracle account for the collateral token
     #[account(
         constraint = custody_oracle_account.key() == custody.oracle.oracle_account
@@ -63,6 +71,7 @@ pub fn get_pnl(ctx: Context<GetPnl>, _params: &GetPnlParams) -> Result<ProfitAnd
     let pool = &ctx.accounts.pool;
     let curtime = ctx.accounts.perpetuals.get_time()?;
     let custody = ctx.accounts.custody.as_mut();
+    let lock_custody = ctx.accounts.lock_custody.as_mut();
 
     let token_price = OraclePrice::new_from_oracle(
         custody.oracle.oracle_type,
@@ -87,6 +96,8 @@ pub fn get_pnl(ctx: Context<GetPnl>, _params: &GetPnlParams) -> Result<ProfitAnd
         &token_price,
         &token_ema_price,
         custody,
+        lock_custody,
+        curtime,
         false,
     )?;
 

@@ -259,7 +259,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     position.collateral_usd = collateral_usd;
     position.unrealized_profit_usd = 0;
     position.unrealized_loss_usd = 0;
-    position.borrow_rate_sum = custody.borrow_rate_sum;
+    position.cumulative_interest_snapshot = lock_custody.get_cumulative_interest(curtime)?;
     position.locked_amount = math::checked_as_u64(locked_amount)?;
     position.collateral_amount = params.collateral;
     position.bump = *ctx
@@ -280,6 +280,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
             &token_price,
             &token_ema_price,
             custody,
+            lock_custody,
+            curtime,
             true
         )?,
         PerpetualsError::MaxLeverage
@@ -321,6 +323,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         custody.trade_stats.oi_short_usd =
             math::checked_add(custody.trade_stats.oi_short_usd, size_usd)?;
     }
+
+    custody.update_borrow_rate(curtime)?;
 
     Ok(())
 }
