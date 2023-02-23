@@ -5,7 +5,7 @@ import * as spl from "@solana/spl-token";
 import { expect, assert } from "chai";
 import  BN  from "bn.js";
 
-describe("perpetuals test suit brooo", () => {
+describe("perpetuals", () => {
   let tc = new TestClient();
   tc.printErrors = true;
   let oracleConfig;
@@ -425,7 +425,7 @@ describe("perpetuals test suit brooo", () => {
       collateralUsd: "123000000",
       unrealizedProfitUsd: "0",
       unrealizedLossUsd: "0",
-      borrowRateSum: "5000000",
+      cumulativeInterestSnapshot: "0",
       lockedAmount: "7000000000",
       collateralAmount: "1000000000",
       bump: position.bump,
@@ -434,7 +434,7 @@ describe("perpetuals test suit brooo", () => {
     expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
-  it("openPosition with different lock token", async () => {
+  it("openPosition with different lock custody", async () => {
     await tc.openPosition(
       125,
       tc.toTokenAmount(1, tc.custodies[0].decimals),
@@ -511,7 +511,7 @@ describe("perpetuals test suit brooo", () => {
   it("liquidate", async () => {
     await tc.openPosition(
       125,
-      tc.toTokenAmount(1, tc.custodies[0].decimals), //type errors
+      tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.toTokenAmount(7, tc.custodies[0].decimals),
       "long",
       tc.users[0],
