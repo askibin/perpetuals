@@ -14,6 +14,7 @@ import {
 } from "@solana/web3.js";
 import * as spl from "@solana/spl-token";
 import  BN  from "bn.js";
+require('dotenv').config();
 
 export type PositionSide = "long" | "short";
 
@@ -252,7 +253,7 @@ export class TestClient {
         lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
         signature: txSignature,
       },
-      { commitment: "processed" }
+      // { commitment: "processed" }
     );
   };
 
@@ -1011,6 +1012,7 @@ export class TestClient {
   };
 
   getEntryPriceAndFee = async (
+    collateral: BN,
     size: BN,
     side: PositionSide,
     custody
@@ -1018,6 +1020,7 @@ export class TestClient {
     try {
       return await this.program.methods
         .getEntryPriceAndFee({
+          collateral,
           size,
           side: side === "long" ? { long: {} } : { short: {} },
         })
@@ -1085,10 +1088,10 @@ export class TestClient {
     }
   };
 
-  getSwapAmountAndFee = async (amountIn: number, custodyIn, custodyOut) => {
+  getSwapAmountAndFees = async (amountIn: number, custodyIn, custodyOut) => {
     try {
       return await this.program.methods
-        .getSwapAmountAndFee({
+        .getSwapAmountAndFees({
           amountIn: new BN(amountIn),
         })
         .accounts({
@@ -1097,10 +1100,8 @@ export class TestClient {
           pool: this.pool.publicKey,
           receivingCustody: custodyIn.custody,
           receivingCustodyOracleAccount: custodyIn.oracleAccount,
-          receivingCustodyTokenAccount: custodyIn.tokenAccount,
           dispensingCustody: custodyOut.custody,
           dispensingCustodyOracleAccount: custodyOut.oracleAccount,
-          dispensingCustodyTokenAccount: custodyOut.tokenAccount,
         })
         .view();
     } catch (err) {

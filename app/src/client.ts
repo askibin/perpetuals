@@ -511,8 +511,8 @@ export class PerpetualsClient {
     poolName: string,
     tokenMint: PublicKey,
     lockTokenMint: PublicKey,
-    collateral: typeof BN,
-    size: typeof BN,
+    collateral: BN,
+    size: BN,
     side: PositionSide
   ) => {
     return await this.program.methods

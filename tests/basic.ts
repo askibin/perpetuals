@@ -5,7 +5,7 @@ import * as spl from "@solana/spl-token";
 import { expect, assert } from "chai";
 import  BN  from "bn.js";
 
-describe("perpetuals", () => {
+describe("perpetuals test suit brooo", () => {
   let tc = new TestClient();
   tc.printErrors = true;
   let oracleConfig;
