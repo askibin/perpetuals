@@ -3,11 +3,20 @@ use std::path::Path;
 use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::spl_token;
 use bonfida_test_utils::ProgramTestContextExt;
+use perpetuals::{
+    instructions::{AddCustodyParams, SetTestOraclePriceParams},
+    state::{
+        custody::{Fees, PricingParams},
+        perpetuals::Permissions,
+    },
+};
 use solana_program::{bpf_loader_upgradeable, program_pack::Pack, stake_history::Epoch};
 use solana_program_test::{read_file, ProgramTest, ProgramTestContext};
 use solana_sdk::{account, signature::Keypair, signer::Signer, signers::Signers};
 
-use super::get_program_data_pda;
+use crate::instructions;
+
+use super::{fixtures, get_program_data_pda, get_test_oracle_account};
 
 pub const ANCHOR_DISCRIMINATOR_SIZE: usize = 8;
 
@@ -50,6 +59,13 @@ pub async fn get_token_account(
     spl_token::state::Account::unpack(&raw_account.data).unwrap()
 }
 
+pub async fn get_token_account_balance(
+    program_test_ctx: &mut ProgramTestContext,
+    key: Pubkey,
+) -> u64 {
+    get_token_account(program_test_ctx, key).await.amount
+}
+
 pub async fn get_account<T: anchor_lang::AccountDeserialize>(
     program_test_ctx: &mut ProgramTestContext,
     key: Pubkey,
@@ -82,6 +98,27 @@ pub async fn initialize_token_account(
         .initialize_token_accounts(*mint, &[*owner])
         .await
         .unwrap()[0]
+}
+
+pub async fn initialize_and_fund_token_account(
+    program_test_ctx: &mut ProgramTestContext,
+    mint: &Pubkey,
+    owner: &Pubkey,
+    mint_authority: &Keypair,
+    amount: u64,
+) -> Pubkey {
+    let token_account_address = initialize_token_account(program_test_ctx, mint, owner).await;
+
+    mint_tokens(
+        program_test_ctx,
+        mint_authority,
+        mint,
+        &token_account_address,
+        amount,
+    )
+    .await;
+
+    token_account_address
 }
 
 pub async fn mint_tokens(
@@ -183,4 +220,120 @@ pub async fn create_and_execute_perpetuals_ix<T: InstructionData, U: Signers>(
         .process_transaction(tx)
         .await
         .unwrap();
+}
+
+pub struct SetupCustodyParams {
+    pub mint: Pubkey,
+    pub decimals: u8,
+    pub is_stable: bool,
+    pub target_ratio: u64,
+    pub min_ratio: u64,
+    pub max_ratio: u64,
+    pub initial_price: u64,
+    pub initial_conf: u64,
+    pub oracle_admin: Keypair,
+    pub pricing_params: Option<PricingParams>,
+    pub permissions: Option<Permissions>,
+    pub fees: Option<Fees>,
+}
+
+pub struct SetupCustodyInfo {
+    pub test_oracle_pda: Pubkey,
+    pub custody_pda: Pubkey,
+}
+
+pub async fn setup_pool_with_custodies(
+    program_test_ctx: &mut ProgramTestContext,
+    pool_admin: &Keypair,
+    pool_name: &str,
+    payer: &Keypair,
+    multisig_signers: &[&Keypair],
+    custodies_params: Vec<SetupCustodyParams>,
+) -> (
+    solana_sdk::pubkey::Pubkey,
+    u8,
+    solana_sdk::pubkey::Pubkey,
+    u8,
+    Vec<SetupCustodyInfo>,
+) {
+    let (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump) = instructions::test_add_pool(
+        program_test_ctx,
+        pool_admin,
+        payer,
+        pool_name,
+        multisig_signers,
+    )
+    .await;
+
+    let mut custodies_info: Vec<SetupCustodyInfo> = Vec::new();
+
+    for custody_param in custodies_params {
+        let test_oracle_pda = get_test_oracle_account(&pool_pda, &custody_param.mint).0;
+
+        let custody_pda = {
+            let add_custody_params = AddCustodyParams {
+                is_stable: custody_param.is_stable,
+                oracle: fixtures::oracle_params_regular(test_oracle_pda),
+                pricing: custody_param
+                    .pricing_params
+                    .unwrap_or(fixtures::pricing_params_regular(false)),
+                permissions: custody_param
+                    .permissions
+                    .unwrap_or(fixtures::permissions_full()),
+                fees: custody_param
+                    .fees
+                    .unwrap_or(fixtures::fees_linear_regular()),
+
+                // in BPS, 10_000 = 100%
+                target_ratio: custody_param.target_ratio,
+                min_ratio: custody_param.min_ratio,
+                max_ratio: custody_param.max_ratio,
+            };
+
+            instructions::test_add_custody(
+                program_test_ctx,
+                pool_admin,
+                payer,
+                &pool_pda,
+                &custody_param.mint,
+                custody_param.decimals,
+                add_custody_params,
+                multisig_signers,
+            )
+            .await
+            .0
+        };
+
+        let publish_time = get_current_unix_timestamp(program_test_ctx).await;
+
+        instructions::test_set_test_oracle_price(
+            program_test_ctx,
+            &custody_param.oracle_admin,
+            payer,
+            &pool_pda,
+            &custody_pda,
+            &test_oracle_pda,
+            SetTestOraclePriceParams {
+                price: custody_param.initial_price,
+                expo: -(custody_param.decimals as i32),
+                conf: custody_param.initial_conf,
+                publish_time,
+            },
+            multisig_signers,
+        )
+        .await;
+
+        custodies_info.push(SetupCustodyInfo {
+            test_oracle_pda,
+            custody_pda,
+        });
+    }
+
+    (
+        pool_pda,
+        pool_bump,
+        lp_token_mint_pda,
+        lp_token_mint_bump,
+        custodies_info,
+    )
 }
