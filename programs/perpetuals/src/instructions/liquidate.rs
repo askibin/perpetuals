@@ -172,6 +172,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
             &token_price,
             &token_ema_price,
             custody,
+            lock_custody,
             curtime,
             false
         )?,

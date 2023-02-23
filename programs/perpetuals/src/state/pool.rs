@@ -155,6 +155,7 @@ impl Pool {
             token_price,
             token_ema_price,
             custody,
+            lock_custody,
             curtime,
             liquidation,
         )?;
@@ -371,6 +372,7 @@ impl Pool {
         token_price: &OraclePrice,
         token_ema_price: &OraclePrice,
         custody: &Custody,
+        lock_custody: &Custody,
         curtime: i64,
     ) -> Result<u64> {
         let (profit_usd, loss_usd, _) = self.get_pnl_usd(
@@ -379,6 +381,7 @@ impl Pool {
             token_price,
             token_ema_price,
             custody,
+            lock_custody,
             curtime,
             false,
         )?;
@@ -416,6 +419,7 @@ impl Pool {
         token_price: &OraclePrice,
         token_ema_price: &OraclePrice,
         custody: &Custody,
+        lock_custody: &Custody,
         curtime: i64,
         initial: bool,
     ) -> Result<bool> {
@@ -425,6 +429,7 @@ impl Pool {
             token_price,
             token_ema_price,
             custody,
+            lock_custody,
             curtime,
         )?;
 
@@ -519,6 +524,7 @@ impl Pool {
         token_price: &OraclePrice,
         token_ema_price: &OraclePrice,
         custody: &Custody,
+        lock_custody: &Custody,
         curtime: i64,
         liquidation: bool,
     ) -> Result<(u64, u64, u64)> {
@@ -534,7 +540,7 @@ impl Pool {
         };
 
         let exit_fee_usd = token_price.get_asset_amount_usd(exit_fee, custody.decimals)?;
-        let interest_usd = self.get_interest_amount_usd(position, custody, curtime)?;
+        let interest_usd = self.get_interest_amount_usd(position, lock_custody, curtime)?;
         let unrealized_loss_usd = math::checked_add(
             math::checked_add(exit_fee_usd, interest_usd)?,
             position.unrealized_loss_usd,
@@ -1149,7 +1155,7 @@ mod test {
 
     #[test]
     fn test_get_pnl_usd() {
-        let (pool, custody, _lock_custody, mut position, token_price, token_ema_price, _lock_token_price) = get_fixture();
+        let (pool, custody, lock_custody, mut position, token_price, token_ema_price, _lock_token_price) = get_fixture();
 
         assert_eq!(
             (scale_f64(3.9, Perpetuals::USD_DECIMALS), 0, 0),
@@ -1159,6 +1165,7 @@ mod test {
                 &token_price,
                 &token_ema_price,
                 &custody,
+                &lock_custody,
                 0,
                 false
             )
@@ -1174,6 +1181,7 @@ mod test {
                 &token_price,
                 &token_ema_price,
                 &custody,
+                &lock_custody,
                 0,
                 false
             )
@@ -1189,6 +1197,7 @@ mod test {
                 &token_price,
                 &token_ema_price,
                 &custody,
+                &lock_custody,
                 0,
                 false
             )
@@ -1198,53 +1207,53 @@ mod test {
 
     #[test]
     fn test_get_leverage() {
-        let (pool, custody, _lock_custody, mut position, token_price, token_ema_price, _lock_token_price) = get_fixture();
+        let (pool, custody, lock_custody, mut position, token_price, token_ema_price, _lock_token_price) = get_fixture();
 
         assert_eq!(
             scale_f64(4.9043, Perpetuals::BPS_DECIMALS),
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
 
         position.price = scale(110, Perpetuals::PRICE_DECIMALS);
         assert_eq!(
             scale_f64(3.9385, Perpetuals::BPS_DECIMALS),
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
 
         position.price = scale(130, Perpetuals::PRICE_DECIMALS);
         assert_eq!(
             scale_f64(6.4977, Perpetuals::BPS_DECIMALS),
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
 
         position.price = scale(80, Perpetuals::PRICE_DECIMALS);
         assert_eq!(
             scale_f64(2.4758, Perpetuals::BPS_DECIMALS),
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
 
         position.price = scale(0, Perpetuals::PRICE_DECIMALS);
         assert_eq!(
             scale_f64(1.2439, Perpetuals::BPS_DECIMALS),
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
 
         position.price = scale(160, Perpetuals::PRICE_DECIMALS);
         assert_eq!(
             2564102,
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
 
         position.price = scale(180, Perpetuals::PRICE_DECIMALS);
         assert_eq!(
             u64::MAX,
-            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, 0)
+            pool.get_leverage(0, &position, &token_price, &token_ema_price, &custody, &lock_custody, 0)
                 .unwrap()
         );
     }
