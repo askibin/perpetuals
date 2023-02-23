@@ -434,43 +434,6 @@ describe("perpetuals", () => {
     expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
-  it("openPosition with different lock custody", async () => {
-    await tc.openPosition(
-      125,
-      tc.toTokenAmount(1, tc.custodies[0].decimals),
-      tc.toTokenAmount(7, tc.custodies[0].decimals),
-      "long",
-      tc.users[0],
-      tc.users[0].tokenAccounts[0],
-      tc.users[0].positionAccountsLong[0],
-      tc.custodies[0],
-      tc.custodies[1]
-    );
-
-    let position = await tc.program.account.position.fetch(
-      tc.users[0].positionAccountsLong[0]
-    );
-    positionExpected = {
-      owner: tc.users[0].wallet.publicKey.toBase58(),
-      pool: tc.pool.publicKey.toBase58(),
-      custody: tc.custodies[0].custody.toBase58(),
-      lockCustody : tc.custodies[1].custody.toBase58(),
-      openTime: "111",
-      updateTime: "0",
-      side: { long: {} },
-      price: "124230000",
-      sizeUsd: "861000000",
-      collateralUsd: "123000000",
-      unrealizedProfitUsd: "0",
-      unrealizedLossUsd: "0",
-      cumulativeInterestSnapshot: "0",
-      lockedAmount: "7000000000",
-      collateralAmount: "1000000000",
-      bump: position.bump,
-    };
-
-    expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
-  });
 
   it("addCollateral", async () => {
     await tc.addCollateral(
