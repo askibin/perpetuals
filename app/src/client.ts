@@ -197,6 +197,11 @@ export class PerpetualsClient {
     );
   };
 
+  // can use this to reduce params
+  getPositionLockCustody = async (positionAccount : PublicKey) => {
+    return (await this.program.account.position.fetch(positionAccount)).lockCustody;
+  }
+
   getPoolTokenPositions = async (poolName: string, tokenMint: PublicKey) => {
     let poolKey = this.getPoolKey(poolName);
     let data = encode(Buffer.concat([poolKey.toBuffer(), Buffer.from([0])]));
@@ -434,6 +439,7 @@ export class PerpetualsClient {
     wallet: PublicKey,
     poolName: string,
     tokenMint: PublicKey,
+    lockTokenMint : PublicKey,
     side: PositionSide,
     receivingAccount: PublicKey,
     rewardsReceivingAccount: PublicKey
@@ -456,6 +462,15 @@ export class PerpetualsClient {
         custodyTokenAccount: this.getCustodyTokenAccountKey(
           poolName,
           tokenMint
+        ),
+        lockCustody: this.getCustodyKey(poolName, lockTokenMint),
+        lockCustodyOracleAccount: await this.getCustodyOracleAccountKey(
+          poolName,
+          lockTokenMint
+        ),
+        lockCustodyTokenAccount: this.getCustodyTokenAccountKey(
+          poolName,
+          lockTokenMint
         ),
         tokenProgram: TOKEN_PROGRAM_ID,
       })
@@ -495,8 +510,9 @@ export class PerpetualsClient {
   getEntryPriceAndFee = async (
     poolName: string,
     tokenMint: PublicKey,
-    collateral: typeof BN,
-    size: typeof BN,
+    lockTokenMint: PublicKey,
+    collateral: BN,
+    size: BN,
     side: PositionSide
   ) => {
     return await this.program.methods
@@ -514,6 +530,12 @@ export class PerpetualsClient {
           poolName,
           tokenMint
         ),
+        lockCustody: this.getCustodyKey(poolName, lockTokenMint),
+        lockCustodyOracleAccount: await this.getCustodyOracleAccountKey(
+          poolName,
+          lockTokenMint
+        ),
+
       })
       .view()
       .catch((err) => {

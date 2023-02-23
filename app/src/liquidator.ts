@@ -56,6 +56,7 @@ async function processLiquidations(
           position.owner,
           poolName,
           tokenMint,
+          position.lockCustody,
           position_side,
           userTokenAccount,
           rewardReceivingAccount

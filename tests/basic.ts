@@ -3,7 +3,7 @@ import { TestClient } from "./test_client";
 import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import * as spl from "@solana/spl-token";
 import { expect, assert } from "chai";
-import { BN } from "bn.js";
+import  BN  from "bn.js";
 
 describe("perpetuals", () => {
   let tc = new TestClient();
@@ -405,6 +405,7 @@ describe("perpetuals", () => {
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
+      tc.custodies[0],
       tc.custodies[0]
     );
 
@@ -415,6 +416,7 @@ describe("perpetuals", () => {
       owner: tc.users[0].wallet.publicKey.toBase58(),
       pool: tc.pool.publicKey.toBase58(),
       custody: tc.custodies[0].custody.toBase58(),
+      lockCustody : tc.custodies[0].custody.toBase58(),
       openTime: "111",
       updateTime: "0",
       side: { long: {} },
@@ -432,12 +434,14 @@ describe("perpetuals", () => {
     expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
+
   it("addCollateral", async () => {
     await tc.addCollateral(
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
+      tc.custodies[0],
       tc.custodies[0]
     );
   });
@@ -448,6 +452,7 @@ describe("perpetuals", () => {
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
+      tc.custodies[0],
       tc.custodies[0]
     );
   });
@@ -458,6 +463,7 @@ describe("perpetuals", () => {
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
+      tc.custodies[0],
       tc.custodies[0]
     );
     tc.ensureFails(
@@ -474,6 +480,7 @@ describe("perpetuals", () => {
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
+      tc.custodies[0],
       tc.custodies[0]
     );
     await tc.setTestOraclePrice(80, tc.custodies[0]);
@@ -481,10 +488,12 @@ describe("perpetuals", () => {
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
+      tc.custodies[0],
       tc.custodies[0]
     );
     tc.ensureFails(
       tc.program.account.position.fetch(tc.users[0].positionAccountsLong[0])
     );
   });
+
 });

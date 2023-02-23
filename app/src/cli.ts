@@ -163,6 +163,7 @@ async function getAllPositions() {
 async function getEntryPriceAndFee(
   poolName: string,
   tokenMint: PublicKey,
+  lockTokenMint: PublicKey,
   collateral: BN,
   size: BN,
   side: PositionSide
@@ -171,6 +172,7 @@ async function getEntryPriceAndFee(
     await client.getEntryPriceAndFee(
       poolName,
       tokenMint,
+      lockTokenMint,
       collateral,
       size,
       side
@@ -420,13 +422,15 @@ async function getSwapAmountAndFees(
     .description("Compute price and fee to open a position")
     .argument("<string>", "Pool name")
     .argument("<pubkey>", "Token mint")
+    .argument("<pubkey>", "Lock Token mint")
     .argument("<string>", "Position side (long / short)")
     .requiredOption("-c, --collateral <bigint>", "Collateral")
     .requiredOption("-s, --size <bigint>", "Size")
-    .action(async (poolName, tokenMint, side, options) => {
+    .action(async (poolName, tokenMint, lockTokenMint,  side, options) => {
       await getEntryPriceAndFee(
         poolName,
         new PublicKey(tokenMint),
+        new PublicKey(lockTokenMint),
         new BN(options.collateral),
         new BN(options.size),
         side
