@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::utils::{self, pda};
-use anchor_lang::{prelude::AccountMeta, InstructionData, ToAccountMetas};
+use anchor_lang::{prelude::AccountMeta, ToAccountMetas};
 use perpetuals::{
     instructions::AddPoolParams,
     state::{multisig::Multisig, perpetuals::Perpetuals, pool::Pool},
@@ -59,30 +59,18 @@ pub async fn test_add_pool(
             accounts_meta
         };
 
-        let arguments = perpetuals::instruction::AddPool {
-            params: AddPoolParams {
-                name: String::from_str(pool_name).unwrap(),
+        utils::create_and_execute_perpetuals_ix(
+            program_test_ctx,
+            accounts_meta,
+            perpetuals::instruction::AddPool {
+                params: AddPoolParams {
+                    name: String::from_str(pool_name).unwrap(),
+                },
             },
-        };
-
-        let ix = solana_sdk::instruction::Instruction {
-            program_id: perpetuals::id(),
-            accounts: accounts_meta,
-            data: arguments.data(),
-        };
-
-        let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
-            &[ix],
             Some(&payer.pubkey()),
             &[admin, payer, signer],
-            program_test_ctx.last_blockhash,
-        );
-
-        program_test_ctx
-            .banks_client
-            .process_transaction(tx)
-            .await
-            .unwrap();
+        )
+        .await;
     }
 
     // ==== THEN ==============================================================

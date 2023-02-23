@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::AccountMeta, InstructionData, ToAccountMetas};
+use anchor_lang::{prelude::AccountMeta, ToAccountMetas};
 use perpetuals::{
     instructions::InitParams,
     state::{multisig::Multisig, perpetuals::Perpetuals},
@@ -45,26 +45,14 @@ pub async fn test_init(
         accounts_meta
     };
 
-    let arguments = perpetuals::instruction::Init { params };
-
-    let ix = solana_sdk::instruction::Instruction {
-        program_id: perpetuals::id(),
-        accounts: accounts_meta,
-        data: arguments.data(),
-    };
-
-    let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
-        &[ix],
+    utils::create_and_execute_perpetuals_ix(
+        program_test_ctx,
+        accounts_meta,
+        perpetuals::instruction::Init { params },
         Some(&upgrade_authority.pubkey()),
         &[&[upgrade_authority], multisig_signers].concat(),
-        program_test_ctx.last_blockhash,
-    );
-
-    program_test_ctx
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .unwrap();
+    )
+    .await;
 
     // ==== THEN ==============================================================
     let perpetuals_account =

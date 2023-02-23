@@ -1,7 +1,7 @@
 use crate::utils::{self, pda};
 use anchor_lang::{
     prelude::{AccountMeta, Pubkey},
-    InstructionData, ToAccountMetas,
+    ToAccountMetas,
 };
 use perpetuals::{
     instructions::SetTestOraclePriceParams,
@@ -52,26 +52,14 @@ pub async fn test_set_test_oracle_price(
             accounts_meta
         };
 
-        let arguments = perpetuals::instruction::SetTestOraclePrice { params };
-
-        let ix = solana_sdk::instruction::Instruction {
-            program_id: perpetuals::id(),
-            accounts: accounts_meta,
-            data: arguments.data(),
-        };
-
-        let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
-            &[ix],
+        utils::create_and_execute_perpetuals_ix(
+            program_test_ctx,
+            accounts_meta,
+            perpetuals::instruction::SetTestOraclePrice { params },
             Some(&payer.pubkey()),
             &[admin, payer, signer],
-            program_test_ctx.last_blockhash,
-        );
-
-        program_test_ctx
-            .banks_client
-            .process_transaction(tx)
-            .await
-            .unwrap();
+        )
+        .await;
     }
 
     // ==== THEN ==============================================================

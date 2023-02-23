@@ -1,11 +1,11 @@
 use std::path::Path;
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::spl_token;
 use bonfida_test_utils::ProgramTestContextExt;
-use solana_program::{bpf_loader_upgradeable, stake_history::Epoch, program_pack::Pack};
+use solana_program::{bpf_loader_upgradeable, program_pack::Pack, stake_history::Epoch};
 use solana_program_test::{read_file, ProgramTest, ProgramTestContext};
-use solana_sdk::{account, signature::Keypair, signer::Signer};
+use solana_sdk::{account, signature::Keypair, signer::Signer, signers::Signers};
 
 use super::get_program_data_pda;
 
@@ -43,7 +43,9 @@ pub async fn get_token_account(
     let raw_account = program_test_ctx
         .banks_client
         .get_account(key)
-        .await.unwrap().unwrap();
+        .await
+        .unwrap()
+        .unwrap();
 
     spl_token::state::Account::unpack(&raw_account.data).unwrap()
 }
@@ -154,4 +156,31 @@ pub async fn create_and_fund_multiple_accounts(
         .for_each(|k| create_and_fund_account(&k.pubkey(), program_test));
 
     keypairs
+}
+
+pub async fn create_and_execute_perpetuals_ix<T: InstructionData, U: Signers>(
+    program_test_ctx: &mut ProgramTestContext,
+    accounts_meta: Vec<AccountMeta>,
+    args: T,
+    payer: Option<&Pubkey>,
+    signing_keypairs: &U,
+) {
+    let ix = solana_sdk::instruction::Instruction {
+        program_id: perpetuals::id(),
+        accounts: accounts_meta,
+        data: args.data(),
+    };
+
+    let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
+        &[ix],
+        payer,
+        signing_keypairs,
+        program_test_ctx.last_blockhash,
+    );
+
+    program_test_ctx
+        .banks_client
+        .process_transaction(tx)
+        .await
+        .unwrap();
 }

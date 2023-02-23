@@ -1,5 +1,5 @@
 use crate::utils::{self, pda};
-use anchor_lang::{prelude::Pubkey, InstructionData, ToAccountMetas};
+use anchor_lang::{prelude::Pubkey, ToAccountMetas};
 use bonfida_test_utils::ProgramTestContextExt;
 use perpetuals::{
     instructions::OpenPositionParams,
@@ -44,8 +44,9 @@ pub async fn test_open_position(
         .await
         .unwrap();
 
-    let accounts_meta = {
-        let accounts = perpetuals::accounts::OpenPosition {
+    utils::create_and_execute_perpetuals_ix(
+        program_test_ctx,
+        perpetuals::accounts::OpenPosition {
             owner: owner.pubkey(),
             funding_account: funding_account_address,
             transfer_authority: transfer_authority_pda,
@@ -57,31 +58,13 @@ pub async fn test_open_position(
             custody_token_account: custody_token_account_pda,
             system_program: anchor_lang::system_program::ID,
             token_program: anchor_spl::token::ID,
-        };
-
-        accounts.to_account_metas(None)
-    };
-
-    let arguments = perpetuals::instruction::OpenPosition { params };
-
-    let ix = solana_sdk::instruction::Instruction {
-        program_id: perpetuals::id(),
-        accounts: accounts_meta,
-        data: arguments.data(),
-    };
-
-    let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
-        &[ix],
+        }
+        .to_account_metas(None),
+        perpetuals::instruction::OpenPosition { params },
         Some(&payer.pubkey()),
         &[owner, payer],
-        program_test_ctx.last_blockhash,
-    );
-
-    program_test_ctx
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .unwrap();
+    )
+    .await;
 
     // ==== THEN ==============================================================
     // Check the balance change

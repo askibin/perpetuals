@@ -1,5 +1,5 @@
 use crate::utils::{self, pda};
-use anchor_lang::{prelude::Pubkey, InstructionData, ToAccountMetas};
+use anchor_lang::{prelude::Pubkey, ToAccountMetas};
 use bonfida_test_utils::ProgramTestContextExt;
 use perpetuals::{instructions::ClosePositionParams, state::custody::Custody};
 use solana_program_test::ProgramTestContext;
@@ -39,8 +39,9 @@ pub async fn test_close_position(
         .await
         .unwrap();
 
-    let accounts_meta = {
-        let accounts = perpetuals::accounts::ClosePosition {
+    utils::create_and_execute_perpetuals_ix(
+        program_test_ctx,
+        perpetuals::accounts::ClosePosition {
             owner: owner.pubkey(),
             receiving_account: receiving_account_address,
             transfer_authority: transfer_authority_pda,
@@ -51,31 +52,13 @@ pub async fn test_close_position(
             custody_oracle_account: custody_oracle_account_address,
             custody_token_account: custody_token_account_pda,
             token_program: anchor_spl::token::ID,
-        };
-
-        accounts.to_account_metas(None)
-    };
-
-    let arguments = perpetuals::instruction::ClosePosition { params };
-
-    let ix = solana_sdk::instruction::Instruction {
-        program_id: perpetuals::id(),
-        accounts: accounts_meta,
-        data: arguments.data(),
-    };
-
-    let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
-        &[ix],
+        }
+        .to_account_metas(None),
+        perpetuals::instruction::ClosePosition { params },
         Some(&payer.pubkey()),
         &[owner, payer],
-        program_test_ctx.last_blockhash,
-    );
-
-    program_test_ctx
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .unwrap();
+    )
+    .await;
 
     // ==== THEN ==============================================================
     // Check the balance change
