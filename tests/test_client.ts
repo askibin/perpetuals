@@ -13,7 +13,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import * as spl from "@solana/spl-token";
-import { BN } from "bn.js";
+import  BN  from "bn.js";
 
 export type PositionSide = "long" | "short";
 
@@ -610,8 +610,8 @@ export class TestClient {
   };
 
   withdrawFees = async (
-    tokenAmount: typeof BN,
-    solAmount: typeof BN,
+    tokenAmount: BN,
+    solAmount: BN,
     custody,
     receivingTokenAccount,
     receivingSolAccount
@@ -709,8 +709,8 @@ export class TestClient {
   };
 
   swap = async (
-    amountIn: typeof BN,
-    minAmountOut: typeof BN,
+    amountIn: BN,
+    minAmountOut: BN,
     user,
     fundingAccount: PublicKey,
     receivingAccount: PublicKey,
@@ -749,7 +749,7 @@ export class TestClient {
   };
 
   addLiquidity = async (
-    amount: typeof BN,
+    amount: BN,
     user,
     fundingAccount: PublicKey,
     custody
@@ -784,7 +784,7 @@ export class TestClient {
   };
 
   removeLiquidity = async (
-    lpAmount: typeof BN,
+    lpAmount: BN,
     user,
     receivingAccount: PublicKey,
     custody
@@ -820,8 +820,8 @@ export class TestClient {
 
   openPosition = async (
     price: number,
-    collateral: typeof BN,
-    size: typeof BN,
+    collateral:  BN,
+    size:  BN,
     side: PositionSide,
     user,
     fundingAccount: PublicKey,
@@ -863,7 +863,7 @@ export class TestClient {
   };
 
   addCollateral = async (
-    collateral: typeof BN,
+    collateral: BN,
     user,
     fundingAccount: PublicKey,
     positionAccount: PublicKey,
@@ -901,7 +901,7 @@ export class TestClient {
   };
 
   removeCollateral = async (
-    collateralUsd: typeof BN,
+    collateralUsd: BN,
     user,
     receivingAccount: PublicKey,
     positionAccount: PublicKey,
@@ -1011,7 +1011,7 @@ export class TestClient {
   };
 
   getEntryPriceAndFee = async (
-    size: typeof BN,
+    size: BN,
     side: PositionSide,
     custody
   ) => {
@@ -1038,7 +1038,7 @@ export class TestClient {
   };
 
   getExitPriceAndFee = async (
-    size: typeof BN,
+    size: BN,
     positionAccount: PublicKey,
     custody
   ) => {
