@@ -4,9 +4,11 @@ use anchor_lang::{prelude::*, InstructionData};
 use anchor_spl::token::spl_token;
 use bonfida_test_utils::ProgramTestContextExt;
 use perpetuals::{
-    instructions::{AddCustodyParams, SetTestOraclePriceParams},
+    instructions::{
+        AddCustodyParams, AddLiquidityParams, SetCustodyConfigParams, SetTestOraclePriceParams,
+    },
     state::{
-        custody::{Fees, PricingParams},
+        custody::{Custody, Fees, PricingParams},
         perpetuals::Permissions,
     },
 };
@@ -222,6 +224,133 @@ pub async fn create_and_execute_perpetuals_ix<T: InstructionData, U: Signers>(
         .unwrap();
 }
 
+pub async fn set_custody_ratios(
+    program_test_ctx: &mut ProgramTestContext,
+    custody_admin: &Keypair,
+    payer: &Keypair,
+    custody_pda: &Pubkey,
+    target_ratio: u64,
+    min_ratio: u64,
+    max_ratio: u64,
+    multisig_signers: &[&Keypair],
+) {
+    let custody_account = get_account::<Custody>(program_test_ctx, *custody_pda).await;
+
+    instructions::test_set_custody_config(
+        program_test_ctx,
+        custody_admin,
+        payer,
+        &custody_account.pool,
+        custody_pda,
+        SetCustodyConfigParams {
+            is_stable: custody_account.is_stable,
+            oracle: custody_account.oracle,
+            pricing: custody_account.pricing,
+            permissions: custody_account.permissions,
+            fees: custody_account.fees,
+            target_ratio,
+            min_ratio,
+            max_ratio,
+        },
+        multisig_signers,
+    )
+    .await;
+}
+
+pub struct SetupCustodyWithLiquidityParams {
+    pub setup_custody_params: SetupCustodyParams,
+    pub liquidity_amount: u64,
+    pub payer: Keypair,
+}
+
+// Setup the pool, add custodies then add liquidity
+pub async fn setup_pool_with_custodies_and_liquidity(
+    program_test_ctx: &mut ProgramTestContext,
+    admin: &Keypair,
+    pool_name: &str,
+    payer: &Keypair,
+    multisig_signers: &[&Keypair],
+    custodies_params: Vec<SetupCustodyWithLiquidityParams>,
+) -> (
+    solana_sdk::pubkey::Pubkey,
+    u8,
+    solana_sdk::pubkey::Pubkey,
+    u8,
+    Vec<SetupCustodyInfo>,
+) {
+    // Setup the pool without ratio bound so we can provide liquidity without ratio limit error
+    let (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump, custodies_info) =
+        setup_pool_with_custodies(
+            program_test_ctx,
+            admin,
+            pool_name,
+            payer,
+            multisig_signers,
+            custodies_params
+                .iter()
+                .map(|e| {
+                    let mut params = e.setup_custody_params;
+
+                    params.max_ratio = 10_000;
+                    params.min_ratio = 0;
+
+                    params
+                })
+                .collect(),
+        )
+        .await;
+
+    // Add liquidity
+    for params in custodies_params.as_slice() {
+        initialize_token_account(
+            program_test_ctx,
+            &lp_token_mint_pda,
+            &params.payer.pubkey(),
+        )
+        .await;
+
+        instructions::test_add_liquidity(
+            program_test_ctx,
+            &params.payer,
+            payer,
+            &pool_pda,
+            &params.setup_custody_params.mint,
+            AddLiquidityParams {
+                amount: params.liquidity_amount,
+            },
+        )
+        .await;
+    }
+
+    // Set proper ratios
+    let mut idx = 0;
+
+    for params in custodies_params.as_slice() {
+        set_custody_ratios(
+            program_test_ctx,
+            admin,
+            payer,
+            &custodies_info[idx].custody_pda,
+            params.setup_custody_params.target_ratio,
+            params.setup_custody_params.min_ratio,
+            params.setup_custody_params.max_ratio,
+            multisig_signers,
+        )
+        .await;
+
+        idx += 1;
+    }
+
+    (
+        pool_pda,
+        pool_bump,
+        lp_token_mint_pda,
+        lp_token_mint_bump,
+        custodies_info,
+    )
+}
+
+#[derive(Clone, Copy)]
 pub struct SetupCustodyParams {
     pub mint: Pubkey,
     pub decimals: u8,
@@ -231,12 +360,12 @@ pub struct SetupCustodyParams {
     pub max_ratio: u64,
     pub initial_price: u64,
     pub initial_conf: u64,
-    pub oracle_admin: Keypair,
     pub pricing_params: Option<PricingParams>,
     pub permissions: Option<Permissions>,
     pub fees: Option<Fees>,
 }
 
+#[derive(Clone, Copy)]
 pub struct SetupCustodyInfo {
     pub test_oracle_pda: Pubkey,
     pub custody_pda: Pubkey,
@@ -244,7 +373,7 @@ pub struct SetupCustodyInfo {
 
 pub async fn setup_pool_with_custodies(
     program_test_ctx: &mut ProgramTestContext,
-    pool_admin: &Keypair,
+    admin: &Keypair,
     pool_name: &str,
     payer: &Keypair,
     multisig_signers: &[&Keypair],
@@ -256,14 +385,9 @@ pub async fn setup_pool_with_custodies(
     u8,
     Vec<SetupCustodyInfo>,
 ) {
-    let (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump) = instructions::test_add_pool(
-        program_test_ctx,
-        pool_admin,
-        payer,
-        pool_name,
-        multisig_signers,
-    )
-    .await;
+    let (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump) =
+        instructions::test_add_pool(program_test_ctx, admin, payer, pool_name, multisig_signers)
+            .await;
 
     let mut custodies_info: Vec<SetupCustodyInfo> = Vec::new();
 
@@ -292,7 +416,7 @@ pub async fn setup_pool_with_custodies(
 
             instructions::test_add_custody(
                 program_test_ctx,
-                pool_admin,
+                admin,
                 payer,
                 &pool_pda,
                 &custody_param.mint,
@@ -308,7 +432,7 @@ pub async fn setup_pool_with_custodies(
 
         instructions::test_set_test_oracle_price(
             program_test_ctx,
-            &custody_param.oracle_admin,
+            admin,
             payer,
             &pool_pda,
             &custody_pda,
