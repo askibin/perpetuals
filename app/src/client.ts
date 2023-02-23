@@ -414,7 +414,7 @@ export class PerpetualsClient {
 
   upgradeCustody = async (poolName: string, tokenMint: PublicKey) => {
     await this.program.methods
-    .upgradeCustody({})
+      .upgradeCustody({})
       .accounts({
         admin: this.admin.publicKey,
         multisig: this.multisig.publicKey,

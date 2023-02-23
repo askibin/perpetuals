@@ -212,82 +212,82 @@ impl Custody {
             && self.pricing.validate()
             && self.fees.validate()
             && self.borrow_rate.validate()
-        }
-    
-        pub fn get_cumulative_interest(&self, curtime: i64) -> Result<u128> {
-            if curtime > self.borrow_rate_state.last_update {
-                let cumulative_interest = math::checked_ceil_div(
-                    math::checked_mul(
-                        math::checked_sub(curtime, self.borrow_rate_state.last_update)? as u128,
-                        self.borrow_rate_state.current_rate as u128,
-                    )?,
-                    3600,
-                )?;
-                math::checked_add(
-                    self.borrow_rate_state.cumulative_interest,
-                    cumulative_interest,
-                )
-            } else {
-                Ok(self.borrow_rate_state.cumulative_interest)
-            }
-        }
-    
-        pub fn update_borrow_rate(&mut self, curtime: i64) -> Result<()> {
-            // if current_utilization < optimal_utilization:
-            //   rate = base_rate + (current_utilization / optimal_utilization) * slope1
-            // else:
-            //   rate = base_rate + slope1 + (current_utilization - optimal_utilization) / (1 - optimal_utilization) * slope2
-    
-            if self.assets.owned == 0 {
-                self.borrow_rate_state.current_rate = 0;
-                self.borrow_rate_state.last_update =
-                    std::cmp::max(curtime, self.borrow_rate_state.last_update);
-                return Ok(());
-            }
-    
-            if curtime > self.borrow_rate_state.last_update {
-                // compute interest accumulated since previous update
-                self.borrow_rate_state.cumulative_interest = self.get_cumulative_interest(curtime)?;
-                self.borrow_rate_state.last_update = curtime;
-            }
-    
-            // get current utilization
-            let current_utilization = math::checked_div(
-                math::checked_mul(self.assets.locked as u128, Perpetuals::RATE_POWER)?,
-                self.assets.owned as u128,
+    }
+
+    pub fn get_cumulative_interest(&self, curtime: i64) -> Result<u128> {
+        if curtime > self.borrow_rate_state.last_update {
+            let cumulative_interest = math::checked_ceil_div(
+                math::checked_mul(
+                    math::checked_sub(curtime, self.borrow_rate_state.last_update)? as u128,
+                    self.borrow_rate_state.current_rate as u128,
+                )?,
+                3600,
             )?;
-    
-            // compute and save new borrow rate
-            let hourly_rate = if current_utilization < (self.borrow_rate.optimal_utilization as u128)
-                || (self.borrow_rate.optimal_utilization as u128) >= Perpetuals::RATE_POWER
-            {
+            math::checked_add(
+                self.borrow_rate_state.cumulative_interest,
+                cumulative_interest,
+            )
+        } else {
+            Ok(self.borrow_rate_state.cumulative_interest)
+        }
+    }
+
+    pub fn update_borrow_rate(&mut self, curtime: i64) -> Result<()> {
+        // if current_utilization < optimal_utilization:
+        //   rate = base_rate + (current_utilization / optimal_utilization) * slope1
+        // else:
+        //   rate = base_rate + slope1 + (current_utilization - optimal_utilization) / (1 - optimal_utilization) * slope2
+
+        if self.assets.owned == 0 {
+            self.borrow_rate_state.current_rate = 0;
+            self.borrow_rate_state.last_update =
+                std::cmp::max(curtime, self.borrow_rate_state.last_update);
+            return Ok(());
+        }
+
+        if curtime > self.borrow_rate_state.last_update {
+            // compute interest accumulated since previous update
+            self.borrow_rate_state.cumulative_interest = self.get_cumulative_interest(curtime)?;
+            self.borrow_rate_state.last_update = curtime;
+        }
+
+        // get current utilization
+        let current_utilization = math::checked_div(
+            math::checked_mul(self.assets.locked as u128, Perpetuals::RATE_POWER)?,
+            self.assets.owned as u128,
+        )?;
+
+        // compute and save new borrow rate
+        let hourly_rate = if current_utilization < (self.borrow_rate.optimal_utilization as u128)
+            || (self.borrow_rate.optimal_utilization as u128) >= Perpetuals::RATE_POWER
+        {
+            math::checked_div(
+                math::checked_mul(current_utilization, self.borrow_rate.slope1 as u128)?,
+                self.borrow_rate.optimal_utilization as u128,
+            )?
+        } else {
+            math::checked_add(
+                self.borrow_rate.slope1 as u128,
                 math::checked_div(
-                    math::checked_mul(current_utilization, self.borrow_rate.slope1 as u128)?,
-                    self.borrow_rate.optimal_utilization as u128,
-                )?
-            } else {
-                math::checked_add(
-                    self.borrow_rate.slope1 as u128,
-                    math::checked_div(
-                        math::checked_mul(
-                            math::checked_sub(
-                                current_utilization,
-                                self.borrow_rate.optimal_utilization as u128,
-                            )?,
-                            self.borrow_rate.slope2 as u128,
+                    math::checked_mul(
+                        math::checked_sub(
+                            current_utilization,
+                            self.borrow_rate.optimal_utilization as u128,
                         )?,
-                        Perpetuals::RATE_POWER - self.borrow_rate.optimal_utilization as u128,
+                        self.borrow_rate.slope2 as u128,
                     )?,
-                )?
-            };
-            let hourly_rate = math::checked_add(
-                math::checked_as_u64(hourly_rate)?,
-                self.borrow_rate.base_rate,
-            )?;
-    
-            self.borrow_rate_state.current_rate = hourly_rate;
-    
-            Ok(())
+                    Perpetuals::RATE_POWER - self.borrow_rate.optimal_utilization as u128,
+                )?,
+            )?
+        };
+        let hourly_rate = math::checked_add(
+            math::checked_as_u64(hourly_rate)?,
+            self.borrow_rate.base_rate,
+        )?;
+
+        self.borrow_rate_state.current_rate = hourly_rate;
+
+        Ok(())
     }
 }
 
