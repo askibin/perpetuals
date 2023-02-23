@@ -25,7 +25,6 @@ async function processLiquidations(
   let undercollateralized = 0;
   let liquidated = 0;
   for (const position of positions) {
-    console.log("log position :",position);
     let position_side =
       JSON.stringify(position.side) === JSON.stringify({ long: {} })
         ? "long"
@@ -57,7 +56,7 @@ async function processLiquidations(
           position.owner,
           poolName,
           tokenMint,
-          position.lockCustody, // check if string or pubKey
+          position.lockCustody,
           position_side,
           userTokenAccount,
           rewardReceivingAccount
