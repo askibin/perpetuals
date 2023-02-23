@@ -200,7 +200,7 @@ pub fn remove_liquidity(
 
     // update pool stats
     msg!("Update pool stats");
-    pool.aum_usd = pool_amount_usd.wrapping_sub(remove_amount_usd.into());
+    pool.aum_usd = math::checked_sub(pool_amount_usd, remove_amount_usd.into())?;
 
     Ok(())
 }

@@ -146,6 +146,8 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
         params.amount,
     )?;
 
+    let transfered_token_usd = token_price.get_asset_amount_usd(params.amount, custody.decimals)?;
+
     // compute assets under management
     msg!("Compute assets under management");
     let pool_amount_usd = pool.get_assets_under_management_usd(ctx.remaining_accounts, curtime)?;
@@ -192,7 +194,7 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
     custody.volume_stats.add_liquidity_usd = custody
         .volume_stats
         .add_liquidity_usd
-        .wrapping_add(token_price.get_asset_amount_usd(params.amount, custody.decimals)?);
+        .wrapping_add(transfered_token_usd);
 
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
@@ -202,11 +204,7 @@ pub fn add_liquidity(ctx: Context<AddLiquidity>, params: &AddLiquidityParams) ->
 
     // update pool stats
     msg!("Update pool stats");
-    pool.aum_usd = pool_amount_usd.wrapping_add(
-        token_price
-            .get_asset_amount_usd(params.amount, custody.decimals)?
-            .into(),
-    );
+    pool.aum_usd = math::checked_add(pool_amount_usd, transfered_token_usd.into())?;
 
     Ok(())
 }
