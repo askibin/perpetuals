@@ -1,3 +1,5 @@
+use perpetuals::math;
+
 use {
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
     crate::instructions,
@@ -455,4 +457,15 @@ pub async fn setup_pool_with_custodies(
         lp_token_mint_bump,
         custodies_info,
     )
+}
+
+pub fn scale(amount: u64, decimals: u8) -> u64 {
+    math::checked_mul(amount, 10u64.pow(decimals as u32)).unwrap()
+}
+
+pub fn scale_f64(amount: f64, decimals: u8) -> u64 {
+    math::checked_as_u64(
+        math::checked_float_mul(amount, 10u64.pow(decimals as u32) as f64).unwrap(),
+    )
+    .unwrap()
 }

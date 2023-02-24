@@ -26,6 +26,9 @@ const USER_PAUL: usize = 8;
 
 const KEYPAIRS_COUNT: usize = 9;
 
+const USDC_DECIMALS: u8 = 6;
+const ETH_DECIMALS: u8 = 9;
+
 pub async fn basic_interactions_test_suite() {
     let mut program_test = ProgramTest::default();
 
@@ -35,10 +38,10 @@ pub async fn basic_interactions_test_suite() {
 
     // Initialize mints
     let usdc_mint = program_test
-        .add_mint(None, 6, &keypairs[ROOT_AUTHORITY].pubkey())
+        .add_mint(None, USDC_DECIMALS, &keypairs[ROOT_AUTHORITY].pubkey())
         .0;
     let eth_mint = program_test
-        .add_mint(None, 9, &keypairs[ROOT_AUTHORITY].pubkey())
+        .add_mint(None, ETH_DECIMALS, &keypairs[ROOT_AUTHORITY].pubkey())
         .0;
 
     // Deploy the perpetuals program onchain as upgradeable program
@@ -72,7 +75,7 @@ pub async fn basic_interactions_test_suite() {
                 &usdc_mint,
                 &keypairs[USER_ALICE].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                1_000_000_000,
+                utils::scale(1_000, USDC_DECIMALS),
             )
             .await;
         }
@@ -84,7 +87,7 @@ pub async fn basic_interactions_test_suite() {
                 &usdc_mint,
                 &keypairs[USER_MARTIN].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                100_000_000,
+                utils::scale(100, USDC_DECIMALS),
             )
             .await;
 
@@ -93,7 +96,7 @@ pub async fn basic_interactions_test_suite() {
                 &eth_mint,
                 &keypairs[USER_MARTIN].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                2_000_000_000,
+                utils::scale(2, ETH_DECIMALS),
             )
             .await;
         }
@@ -105,7 +108,7 @@ pub async fn basic_interactions_test_suite() {
                 &usdc_mint,
                 &keypairs[USER_PAUL].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                150_000_000,
+                utils::scale(150, USDC_DECIMALS),
             )
             .await;
 
@@ -128,37 +131,37 @@ pub async fn basic_interactions_test_suite() {
             utils::SetupCustodyWithLiquidityParams {
                 setup_custody_params: utils::SetupCustodyParams {
                     mint: usdc_mint,
-                    decimals: 6,
+                    decimals: USDC_DECIMALS,
                     is_stable: true,
                     target_ratio: 5_000,
                     min_ratio: 0,
                     max_ratio: 10_000,
-                    initial_price: 1_000_000,
-                    initial_conf: 10_000,
+                    initial_price: utils::scale(1, USDC_DECIMALS),
+                    initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
                     pricing_params: None,
                     permissions: None,
                     fees: None,
                 },
                 // Alice add 1k USDC liquidity
-                liquidity_amount: 1_000_000_000,
+                liquidity_amount: utils::scale(1_000, USDC_DECIMALS),
                 payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
             utils::SetupCustodyWithLiquidityParams {
                 setup_custody_params: utils::SetupCustodyParams {
                     mint: eth_mint,
-                    decimals: 9,
+                    decimals: ETH_DECIMALS,
                     is_stable: false,
                     target_ratio: 5_000,
                     min_ratio: 0,
                     max_ratio: 10_000,
-                    initial_price: 1_676_040_000_000,
-                    initial_conf: 10_000_000_000,
+                    initial_price: utils::scale_f64(1_676.04, ETH_DECIMALS),
+                    initial_conf: utils::scale(10, ETH_DECIMALS),
                     pricing_params: None,
                     permissions: None,
                     fees: None,
                 },
                 // Martin add 1 ETH liquidity
-                liquidity_amount: 1_000_000_000,
+                liquidity_amount: utils::scale(1, ETH_DECIMALS),
                 payer: utils::copy_keypair(&keypairs[USER_MARTIN]),
             },
         ],
@@ -176,9 +179,9 @@ pub async fn basic_interactions_test_suite() {
             &usdc_mint,
             OpenPositionParams {
                 // max price paid (slippage implied)
-                price: 1_050_000,
-                collateral: 50_000_000,
-                size: 50_000_000,
+                price: utils::scale_f64(1.05, USDC_DECIMALS),
+                collateral: utils::scale(50, USDC_DECIMALS),
+                size: utils::scale(50, USDC_DECIMALS),
                 side: Side::Long,
             },
         )
@@ -195,7 +198,7 @@ pub async fn basic_interactions_test_suite() {
             &position_pda,
             ClosePositionParams {
                 // lowest exit price paid (slippage implied)
-                price: 990_000,
+                price: utils::scale_f64(0.99, USDC_DECIMALS),
             },
         )
         .await;
@@ -213,10 +216,10 @@ pub async fn basic_interactions_test_suite() {
             // The program receives USDC
             &usdc_mint,
             SwapParams {
-                amount_in: 150_000_000,
+                amount_in: utils::scale(150, USDC_DECIMALS),
 
                 // 1% slippage
-                min_amount_out: 150_000_000 / 1_676_040_000 * 99 / 100,
+                min_amount_out: utils::scale(150, USDC_DECIMALS) / utils::scale_f64(1_676.04, ETH_DECIMALS) * 99 / 100,
             },
         )
         .await;

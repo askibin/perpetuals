@@ -4,7 +4,7 @@
 
 pub mod error;
 pub mod instructions;
-mod math;
+pub mod math;
 pub mod state;
 
 use {
