@@ -1,9 +1,4 @@
 use {
-    std::ops::{Mul, Div},
-    perpetuals::{math, state::perpetuals::Perpetuals},
-};
-
-use {
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
     crate::instructions,
     anchor_lang::{prelude::*, InstructionData},
@@ -18,9 +13,11 @@ use {
             perpetuals::Permissions,
         },
     },
+    perpetuals::{math, state::perpetuals::Perpetuals},
     solana_program::{bpf_loader_upgradeable, program_pack::Pack, stake_history::Epoch},
     solana_program_test::{read_file, ProgramTest, ProgramTestContext},
     solana_sdk::{account, signature::Keypair, signer::Signer, signers::Signers},
+    std::ops::{Div, Mul},
     std::path::Path,
 };
 
@@ -474,5 +471,8 @@ pub fn scale_f64(amount: f64, decimals: u8) -> u64 {
 }
 
 pub fn ratio_from_percentage(percentage: f64) -> u64 {
-    (Perpetuals::BPS_POWER as f64).mul(percentage).div(100_f64).floor() as u64
+    (Perpetuals::BPS_POWER as f64)
+        .mul(percentage)
+        .div(100_f64)
+        .floor() as u64
 }
