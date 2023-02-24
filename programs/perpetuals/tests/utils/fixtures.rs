@@ -1,10 +1,14 @@
 // Contains fixtures values usable in tests, made to reduce boilerplate
 
 use anchor_lang::prelude::Pubkey;
-use perpetuals::{state::{
-    custody::{Fees, FeesMode, PricingParams, OracleParams},
-    perpetuals::Permissions, oracle::OracleType,
-}, instructions::InitParams};
+use perpetuals::{
+    instructions::InitParams,
+    state::{
+        custody::{Fees, FeesMode, OracleParams, PricingParams},
+        oracle::OracleType,
+        perpetuals::Permissions,
+    },
+};
 
 pub fn permissions_full() -> Permissions {
     Permissions {

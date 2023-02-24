@@ -681,7 +681,7 @@ impl Pool {
             let added_aum_usd =
                 token_price.get_asset_amount_usd(amount_add, custody.decimals)? as u128;
 
-                (
+            (
                 token_price.get_asset_amount_usd(
                     math::checked_add(custody.assets.owned, amount_add)?,
                     custody.decimals,

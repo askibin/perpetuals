@@ -302,12 +302,8 @@ pub async fn setup_pool_with_custodies_and_liquidity(
 
     // Add liquidity
     for params in custodies_params.as_slice() {
-        initialize_token_account(
-            program_test_ctx,
-            &lp_token_mint_pda,
-            &params.payer.pubkey(),
-        )
-        .await;
+        initialize_token_account(program_test_ctx, &lp_token_mint_pda, &params.payer.pubkey())
+            .await;
 
         instructions::test_add_liquidity(
             program_test_ctx,
