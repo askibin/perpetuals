@@ -41,6 +41,16 @@ pub struct FeesStats {
 }
 
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
+pub struct RewardsStats {
+    pub swap_lm: u64,
+    pub add_liquidity_lm: u64,
+    pub remove_liquidity_lm: u64,
+    pub open_position_lm: u64,
+    pub close_position_lm: u64,
+    pub liquidation_lm: u64,
+}
+
+#[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct VolumeStats {
     pub swap_usd: u64,
     pub add_liquidity_usd: u64,
@@ -127,6 +137,7 @@ pub struct Custody {
     // dynamic variables
     pub assets: Assets,
     pub collected_fees: FeesStats,
+    pub distributed_rewards: RewardsStats,
     pub volume_stats: VolumeStats,
     pub trade_stats: TradeStats,
     pub borrow_rate_state: BorrowRateState,
@@ -153,6 +164,7 @@ pub struct DeprecatedCustody {
 
     pub assets: Assets,
     pub collected_fees: FeesStats,
+    pub distributed_rewards: RewardsStats,
     pub volume_stats: VolumeStats,
     pub trade_stats: TradeStats,
 
