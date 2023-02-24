@@ -48,9 +48,4 @@ pub enum PerpetualsError {
     UnsupportedToken,
     #[msg("Instruction is not allowed at this time")]
     InstructionNotAllowed,
-    // Test errors
-    #[msg("Instruction data is too short.")]
-    InstructionDataTooShort,
-    #[msg("Instruction data slice is misaligned.")]
-    InstructionDataSliceMisaligned,
 }
