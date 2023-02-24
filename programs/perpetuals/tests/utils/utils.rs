@@ -1,4 +1,7 @@
-use perpetuals::math;
+use {
+    std::ops::{Mul, Div},
+    perpetuals::{math, state::perpetuals::Perpetuals},
+};
 
 use {
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
@@ -468,4 +471,8 @@ pub fn scale_f64(amount: f64, decimals: u8) -> u64 {
         math::checked_float_mul(amount, 10u64.pow(decimals as u32) as f64).unwrap(),
     )
     .unwrap()
+}
+
+pub fn ratio_from_percentage(percentage: f64) -> u64 {
+    (Perpetuals::BPS_POWER as f64).mul(percentage).div(100_f64).floor() as u64
 }

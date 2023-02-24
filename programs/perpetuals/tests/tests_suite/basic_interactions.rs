@@ -133,9 +133,9 @@ pub async fn basic_interactions_test_suite() {
                     mint: usdc_mint,
                     decimals: USDC_DECIMALS,
                     is_stable: true,
-                    target_ratio: 5_000,
-                    min_ratio: 0,
-                    max_ratio: 10_000,
+                    target_ratio: utils::ratio_from_percentage(50.0),
+                    min_ratio: utils::ratio_from_percentage(0.0),
+                    max_ratio: utils::ratio_from_percentage(100.0),
                     initial_price: utils::scale(1, USDC_DECIMALS),
                     initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
                     pricing_params: None,
@@ -151,9 +151,9 @@ pub async fn basic_interactions_test_suite() {
                     mint: eth_mint,
                     decimals: ETH_DECIMALS,
                     is_stable: false,
-                    target_ratio: 5_000,
-                    min_ratio: 0,
-                    max_ratio: 10_000,
+                    target_ratio: utils::ratio_from_percentage(50.0),
+                    min_ratio: utils::ratio_from_percentage(0.0),
+                    max_ratio: utils::ratio_from_percentage(100.0),
                     initial_price: utils::scale_f64(1_676.04, ETH_DECIMALS),
                     initial_conf: utils::scale(10, ETH_DECIMALS),
                     pricing_params: None,
@@ -219,7 +219,10 @@ pub async fn basic_interactions_test_suite() {
                 amount_in: utils::scale(150, USDC_DECIMALS),
 
                 // 1% slippage
-                min_amount_out: utils::scale(150, USDC_DECIMALS) / utils::scale_f64(1_676.04, ETH_DECIMALS) * 99 / 100,
+                min_amount_out: utils::scale(150, USDC_DECIMALS)
+                    / utils::scale_f64(1_676.04, ETH_DECIMALS)
+                    * 99
+                    / 100,
             },
         )
         .await;
