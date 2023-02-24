@@ -1,5 +1,4 @@
-use perpetuals::state::position::Side;
-use solana_sdk::pubkey::Pubkey;
+use {perpetuals::state::position::Side, solana_sdk::pubkey::Pubkey};
 
 pub fn get_multisig_pda() -> (Pubkey, u8) {
     Pubkey::find_program_address(&["multisig".as_ref()], &perpetuals::id())

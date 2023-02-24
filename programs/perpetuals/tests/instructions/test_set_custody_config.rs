@@ -1,14 +1,16 @@
-use crate::utils::{self, pda};
-use anchor_lang::{
-    prelude::{AccountMeta, Pubkey},
-    ToAccountMetas,
+use {
+    crate::utils::{self, pda},
+    anchor_lang::{
+        prelude::{AccountMeta, Pubkey},
+        ToAccountMetas,
+    },
+    perpetuals::{
+        instructions::SetCustodyConfigParams,
+        state::{custody::Custody, multisig::Multisig},
+    },
+    solana_program_test::ProgramTestContext,
+    solana_sdk::signer::{keypair::Keypair, Signer},
 };
-use perpetuals::{
-    instructions::SetCustodyConfigParams,
-    state::{custody::Custody, multisig::Multisig},
-};
-use solana_program_test::ProgramTestContext;
-use solana_sdk::signer::{keypair::Keypair, Signer};
 
 pub async fn test_set_custody_config(
     program_test_ctx: &mut ProgramTestContext,

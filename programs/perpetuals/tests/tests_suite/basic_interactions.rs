@@ -1,14 +1,18 @@
-use crate::{
-    instructions,
-    utils::{self, fixtures},
+use {
+    crate::{
+        instructions,
+        utils::{self, fixtures},
+    },
+    bonfida_test_utils::ProgramTestExt,
+    perpetuals::{
+        instructions::{
+            ClosePositionParams, OpenPositionParams, RemoveLiquidityParams, SwapParams,
+        },
+        state::position::Side,
+    },
+    solana_program_test::ProgramTest,
+    solana_sdk::signer::Signer,
 };
-use bonfida_test_utils::ProgramTestExt;
-use perpetuals::{
-    instructions::{ClosePositionParams, OpenPositionParams, RemoveLiquidityParams, SwapParams},
-    state::position::Side,
-};
-use solana_program_test::ProgramTest;
-use solana_sdk::signer::Signer;
 
 const ROOT_AUTHORITY: usize = 0;
 const PERPETUALS_UPGRADE_AUTHORITY: usize = 1;

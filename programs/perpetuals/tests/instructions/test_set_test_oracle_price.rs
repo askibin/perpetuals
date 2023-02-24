@@ -1,14 +1,16 @@
-use crate::utils::{self, pda};
-use anchor_lang::{
-    prelude::{AccountMeta, Pubkey},
-    ToAccountMetas,
+use {
+    crate::utils::{self, pda},
+    anchor_lang::{
+        prelude::{AccountMeta, Pubkey},
+        ToAccountMetas,
+    },
+    perpetuals::{
+        instructions::SetTestOraclePriceParams,
+        state::{multisig::Multisig, oracle::TestOracle},
+    },
+    solana_program_test::ProgramTestContext,
+    solana_sdk::signer::{keypair::Keypair, Signer},
 };
-use perpetuals::{
-    instructions::SetTestOraclePriceParams,
-    state::{multisig::Multisig, oracle::TestOracle},
-};
-use solana_program_test::ProgramTestContext;
-use solana_sdk::signer::{keypair::Keypair, Signer};
 
 pub async fn test_set_test_oracle_price(
     program_test_ctx: &mut ProgramTestContext,

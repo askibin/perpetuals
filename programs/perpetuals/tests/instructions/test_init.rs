@@ -1,12 +1,13 @@
-use anchor_lang::{prelude::AccountMeta, ToAccountMetas};
-use perpetuals::{
-    instructions::InitParams,
-    state::{multisig::Multisig, perpetuals::Perpetuals},
+use {
+    crate::utils::{self, pda},
+    anchor_lang::{prelude::AccountMeta, ToAccountMetas},
+    perpetuals::{
+        instructions::InitParams,
+        state::{multisig::Multisig, perpetuals::Perpetuals},
+    },
+    solana_program_test::ProgramTestContext,
+    solana_sdk::signer::{keypair::Keypair, Signer},
 };
-use solana_program_test::ProgramTestContext;
-use solana_sdk::signer::{keypair::Keypair, Signer};
-
-use crate::utils::{self, pda};
 
 pub async fn test_init(
     program_test_ctx: &mut ProgramTestContext,

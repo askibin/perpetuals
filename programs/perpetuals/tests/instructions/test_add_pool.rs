@@ -1,13 +1,14 @@
-use std::str::FromStr;
-
-use crate::utils::{self, pda};
-use anchor_lang::{prelude::AccountMeta, ToAccountMetas};
-use perpetuals::{
-    instructions::AddPoolParams,
-    state::{multisig::Multisig, perpetuals::Perpetuals, pool::Pool},
+use {
+    crate::utils::{self, pda},
+    anchor_lang::{prelude::AccountMeta, ToAccountMetas},
+    perpetuals::{
+        instructions::AddPoolParams,
+        state::{multisig::Multisig, perpetuals::Perpetuals, pool::Pool},
+    },
+    solana_program_test::ProgramTestContext,
+    solana_sdk::signer::{keypair::Keypair, Signer},
+    std::str::FromStr,
 };
-use solana_program_test::ProgramTestContext;
-use solana_sdk::signer::{keypair::Keypair, Signer};
 
 pub async fn test_add_pool(
     program_test_ctx: &mut ProgramTestContext,

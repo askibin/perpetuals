@@ -1,12 +1,14 @@
-use crate::utils::{self, pda};
-use anchor_lang::{prelude::Pubkey, ToAccountMetas};
-use bonfida_test_utils::ProgramTestContextExt;
-use perpetuals::{
-    instructions::OpenPositionParams,
-    state::{custody::Custody, perpetuals::Perpetuals, position::Position},
+use {
+    crate::utils::{self, pda},
+    anchor_lang::{prelude::Pubkey, ToAccountMetas},
+    bonfida_test_utils::ProgramTestContextExt,
+    perpetuals::{
+        instructions::OpenPositionParams,
+        state::{custody::Custody, perpetuals::Perpetuals, position::Position},
+    },
+    solana_program_test::ProgramTestContext,
+    solana_sdk::signer::{keypair::Keypair, Signer},
 };
-use solana_program_test::ProgramTestContext;
-use solana_sdk::signer::{keypair::Keypair, Signer};
 
 pub async fn test_open_position(
     program_test_ctx: &mut ProgramTestContext,

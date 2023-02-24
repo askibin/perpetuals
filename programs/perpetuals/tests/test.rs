@@ -1,6 +1,4 @@
-use solana_program_test::tokio;
-
-use crate::tests_suite::*;
+use {crate::tests_suite::*, solana_program_test::tokio};
 
 pub mod instructions;
 pub mod tests_suite;
