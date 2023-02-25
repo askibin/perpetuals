@@ -1,5 +1,4 @@
 use {
-    solana_program_test::BanksClientError,
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
     crate::instructions,
     anchor_lang::{prelude::*, InstructionData},
@@ -16,6 +15,7 @@ use {
     },
     perpetuals::{math, state::perpetuals::Perpetuals},
     solana_program::{bpf_loader_upgradeable, program_pack::Pack, stake_history::Epoch},
+    solana_program_test::BanksClientError,
     solana_program_test::{read_file, ProgramTest, ProgramTestContext},
     solana_sdk::{account, signature::Keypair, signer::Signer, signers::Signers},
     std::ops::{Div, Mul},
@@ -310,18 +310,20 @@ pub async fn setup_pool_with_custodies_and_liquidity(
         initialize_token_account(program_test_ctx, &lp_token_mint_pda, &params.payer.pubkey())
             .await;
 
-        instructions::test_add_liquidity(
-            program_test_ctx,
-            &params.payer,
-            payer,
-            &pool_pda,
-            &params.setup_custody_params.mint,
-            AddLiquidityParams {
-                amount: params.liquidity_amount,
-            },
-        )
-        .await
-        .unwrap();
+        if params.liquidity_amount > 0 {
+            instructions::test_add_liquidity(
+                program_test_ctx,
+                &params.payer,
+                payer,
+                &pool_pda,
+                &params.setup_custody_params.mint,
+                AddLiquidityParams {
+                    amount: params.liquidity_amount,
+                },
+            )
+            .await
+            .unwrap();
+        }
     }
 
     // Set proper ratios

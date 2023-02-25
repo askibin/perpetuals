@@ -1,5 +1,5 @@
 pub mod basic_interactions;
-pub mod min_max_liquidity_ratio;
+pub mod add_remove_liquidity;
 
 pub use basic_interactions::*;
-pub use min_max_liquidity_ratio::*;
+pub use add_remove_liquidity::*;

@@ -24,7 +24,7 @@ const USDC_DECIMALS: u8 = 6;
 const ETH_DECIMALS: u8 = 9;
 
 #[tokio::test]
-pub async fn min_max_liquidity_ratio_test_suite() {
+pub async fn min_max_ratio() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
@@ -64,7 +64,7 @@ pub async fn min_max_liquidity_ratio_test_suite() {
 
     // Initialize and fund associated token accounts
     {
-        // Alice, 100k USDC, 50 ETH
+        // Alice: mint 100k USDC and 50 ETH
         {
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
