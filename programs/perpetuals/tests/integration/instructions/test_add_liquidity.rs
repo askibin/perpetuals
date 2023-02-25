@@ -1,6 +1,5 @@
-use solana_program_test::BanksClientError;
-
 use {
+    solana_program_test::BanksClientError,
     crate::utils::{self, pda},
     anchor_lang::{
         prelude::{AccountMeta, Pubkey},

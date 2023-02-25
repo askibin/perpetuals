@@ -1,6 +1,5 @@
-use solana_program_test::BanksClientError;
-
 use {
+    solana_program_test::BanksClientError,
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
     crate::instructions,
     anchor_lang::{prelude::*, InstructionData},
