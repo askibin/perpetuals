@@ -37,7 +37,7 @@ cargo test -- --nocapture
 Integration tests (Rust) can be started as follows:
 
 ```sh
-cargo test-bpf -- test_integration
+cargo test-bpf -- --nocapture
 ```
 
 Integration tests (Typescript) can be started as follows:
