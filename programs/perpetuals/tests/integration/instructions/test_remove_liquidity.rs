@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{
@@ -20,7 +22,7 @@ pub async fn test_remove_liquidity(
     pool_pda: &Pubkey,
     custody_token_mint: &Pubkey,
     params: RemoveLiquidityParams,
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
 
     // Prepare PDA and addresses
@@ -103,7 +105,7 @@ pub async fn test_remove_liquidity(
         Some(&payer.pubkey()),
         &[owner, payer],
     )
-    .await;
+    .await?;
 
     // ==== THEN ==============================================================
     let owner_receiving_account_after = program_test_ctx
@@ -122,4 +124,6 @@ pub async fn test_remove_liquidity(
     assert!(owner_receiving_account_after.amount > owner_receiving_account_before.amount);
     assert!(owner_lp_token_account_after.amount < owner_lp_token_account_before.amount);
     assert!(custody_token_account_after.amount < custody_token_account_before.amount);
+
+    Ok(())
 }

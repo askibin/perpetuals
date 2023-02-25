@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
     crate::instructions,
@@ -204,7 +206,7 @@ pub async fn create_and_execute_perpetuals_ix<T: InstructionData, U: Signers>(
     args: T,
     payer: Option<&Pubkey>,
     signing_keypairs: &U,
-) {
+) -> std::result::Result<(), BanksClientError> {
     let ix = solana_sdk::instruction::Instruction {
         program_id: perpetuals::id(),
         accounts: accounts_meta,
@@ -218,11 +220,13 @@ pub async fn create_and_execute_perpetuals_ix<T: InstructionData, U: Signers>(
         program_test_ctx.last_blockhash,
     );
 
-    program_test_ctx
-        .banks_client
-        .process_transaction(tx)
-        .await
-        .unwrap();
+    let result = program_test_ctx.banks_client.process_transaction(tx).await;
+
+    if result.is_err() {
+        return Err(result.err().unwrap());
+    }
+
+    Ok(())
 }
 
 pub async fn set_custody_ratios(
@@ -255,7 +259,8 @@ pub async fn set_custody_ratios(
         },
         multisig_signers,
     )
-    .await;
+    .await
+    .unwrap();
 }
 
 pub struct SetupCustodyWithLiquidityParams {
@@ -316,7 +321,8 @@ pub async fn setup_pool_with_custodies_and_liquidity(
                 amount: params.liquidity_amount,
             },
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     // Set proper ratios
@@ -384,7 +390,8 @@ pub async fn setup_pool_with_custodies(
 ) {
     let (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump) =
         instructions::test_add_pool(program_test_ctx, admin, payer, pool_name, multisig_signers)
-            .await;
+            .await
+            .unwrap();
 
     let mut custodies_info: Vec<SetupCustodyInfo> = Vec::new();
 
@@ -422,6 +429,7 @@ pub async fn setup_pool_with_custodies(
                 multisig_signers,
             )
             .await
+            .unwrap()
             .0
         };
 
@@ -442,7 +450,8 @@ pub async fn setup_pool_with_custodies(
             },
             multisig_signers,
         )
-        .await;
+        .await
+        .unwrap();
 
         custodies_info.push(SetupCustodyInfo {
             test_oracle_pda,

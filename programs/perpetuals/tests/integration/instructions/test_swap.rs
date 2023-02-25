@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{prelude::Pubkey, ToAccountMetas},
@@ -17,7 +19,7 @@ pub async fn test_swap(
     // Mint sent by the User
     receiving_custody_token_mint: &Pubkey,
     params: SwapParams,
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
     // Prepare PDA and addresses
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
@@ -75,7 +77,7 @@ pub async fn test_swap(
         Some(&payer.pubkey()),
         &[owner, payer],
     )
-    .await;
+    .await?;
 
     // ==== THEN ==============================================================
     // Check the balance change
@@ -90,4 +92,6 @@ pub async fn test_swap(
 
     assert!(owner_funding_account_after.amount < owner_funding_account_before.amount);
     assert!(custody_receiving_account_after.amount > custody_receiving_account_before.amount);
+
+    Ok(())
 }

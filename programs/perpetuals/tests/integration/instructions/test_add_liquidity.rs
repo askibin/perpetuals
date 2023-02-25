@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{
@@ -20,7 +22,7 @@ pub async fn test_add_liquidity(
     pool_pda: &Pubkey,
     custody_token_mint: &Pubkey,
     params: AddLiquidityParams,
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
     // Prepare PDA and addresses
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
@@ -102,7 +104,7 @@ pub async fn test_add_liquidity(
         Some(&payer.pubkey()),
         &[owner, payer],
     )
-    .await;
+    .await?;
 
     // ==== THEN ==============================================================
     let owner_funding_account_after = program_test_ctx
@@ -121,4 +123,6 @@ pub async fn test_add_liquidity(
     assert!(owner_funding_account_after.amount < owner_funding_account_before.amount);
     assert!(owner_lp_token_account_after.amount > owner_lp_token_account_before.amount);
     assert!(custody_token_account_after.amount > custody_token_account_before.amount);
+
+    Ok(())
 }

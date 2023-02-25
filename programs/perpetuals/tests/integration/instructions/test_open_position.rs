@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{prelude::Pubkey, ToAccountMetas},
@@ -17,7 +19,7 @@ pub async fn test_open_position(
     pool_pda: &Pubkey,
     custody_token_mint: &Pubkey,
     params: OpenPositionParams,
-) -> (solana_sdk::pubkey::Pubkey, u8) {
+) -> std::result::Result<(solana_sdk::pubkey::Pubkey, u8), BanksClientError> {
     // ==== WHEN ==============================================================
 
     // Prepare PDA and addresses
@@ -66,7 +68,7 @@ pub async fn test_open_position(
         Some(&payer.pubkey()),
         &[owner, payer],
     )
-    .await;
+    .await?;
 
     // ==== THEN ==============================================================
     // Check the balance change
@@ -110,5 +112,5 @@ pub async fn test_open_position(
         assert_eq!(position_account.bump, position_bump);
     }
 
-    (position_pda, position_bump)
+    Ok((position_pda, position_bump))
 }

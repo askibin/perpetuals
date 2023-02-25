@@ -7,6 +7,7 @@ pub mod utils;
 #[tokio::test]
 async fn test_integration() {
     basic_interactions_test_suite().await;
+    min_max_liquidity_ratio_test_suite().await;
 
     // add new test suite here ...
 }

@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{
@@ -21,7 +23,7 @@ pub async fn test_set_test_oracle_price(
     oracle_pda: &Pubkey,
     params: SetTestOraclePriceParams,
     multisig_signers: &[&Keypair],
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
     let multisig_pda = pda::get_multisig_pda().0;
     let perpetuals_pda = pda::get_perpetuals_pda().0;
@@ -61,7 +63,7 @@ pub async fn test_set_test_oracle_price(
             Some(&payer.pubkey()),
             &[admin, payer, signer],
         )
-        .await;
+        .await?;
     }
 
     // ==== THEN ==============================================================
@@ -71,4 +73,6 @@ pub async fn test_set_test_oracle_price(
     assert_eq!(test_oracle_account.expo, params.expo);
     assert_eq!(test_oracle_account.conf, params.conf);
     assert_eq!(test_oracle_account.publish_time, params.publish_time);
+
+    Ok(())
 }

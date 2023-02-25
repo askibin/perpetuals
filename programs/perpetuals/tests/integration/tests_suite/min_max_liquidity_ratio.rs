@@ -4,12 +4,8 @@ use {
         utils::{self, fixtures},
     },
     bonfida_test_utils::ProgramTestExt,
-    perpetuals::{
-        instructions::{
-            ClosePositionParams, OpenPositionParams, RemoveLiquidityParams, SwapParams,
-        },
-        state::position::Side,
-    },
+    perpetuals::instructions::AddLiquidityParams,
+    perpetuals::instructions::RemoveLiquidityParams,
     solana_program_test::ProgramTest,
     solana_sdk::signer::Signer,
 };
@@ -21,15 +17,13 @@ const MULTISIG_MEMBER_B: usize = 3;
 const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
 const USER_ALICE: usize = 6;
-const USER_MARTIN: usize = 7;
-const USER_PAUL: usize = 8;
 
-const KEYPAIRS_COUNT: usize = 9;
+const KEYPAIRS_COUNT: usize = 7;
 
 const USDC_DECIMALS: u8 = 6;
 const ETH_DECIMALS: u8 = 9;
 
-pub async fn basic_interactions_test_suite() {
+pub async fn min_max_liquidity_ratio_test_suite() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
@@ -69,59 +63,29 @@ pub async fn basic_interactions_test_suite() {
 
     // Initialize and fund associated token accounts
     {
-        // Alice, 1k USDC
+        // Alice, 100k USDC, 50 ETH
         {
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
                 &usdc_mint,
                 &keypairs[USER_ALICE].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                utils::scale(1_000, USDC_DECIMALS),
-            )
-            .await;
-        }
-
-        // Martin, 100 USDC, 2 ETH
-        {
-            utils::initialize_and_fund_token_account(
-                &mut program_test_ctx,
-                &usdc_mint,
-                &keypairs[USER_MARTIN].pubkey(),
-                &keypairs[ROOT_AUTHORITY],
-                utils::scale(100, USDC_DECIMALS),
+                utils::scale(100_000, USDC_DECIMALS),
             )
             .await;
 
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
                 &eth_mint,
-                &keypairs[USER_MARTIN].pubkey(),
+                &keypairs[USER_ALICE].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                utils::scale(2, ETH_DECIMALS),
-            )
-            .await;
-        }
-
-        // Paul, 150 USDC
-        {
-            utils::initialize_and_fund_token_account(
-                &mut program_test_ctx,
-                &usdc_mint,
-                &keypairs[USER_PAUL].pubkey(),
-                &keypairs[ROOT_AUTHORITY],
-                utils::scale(150, USDC_DECIMALS),
-            )
-            .await;
-
-            utils::initialize_token_account(
-                &mut program_test_ctx,
-                &eth_mint,
-                &keypairs[USER_PAUL].pubkey(),
+                utils::scale(50, ETH_DECIMALS),
             )
             .await;
         }
     }
 
+    // Set the pool with 50%/50% ETH/USDC liquidity
     let (pool_pda, _, lp_token_mint_pda, _, _) = utils::setup_pool_with_custodies_and_liquidity(
         &mut program_test_ctx,
         &keypairs[MULTISIG_MEMBER_A],
@@ -135,16 +99,15 @@ pub async fn basic_interactions_test_suite() {
                     decimals: USDC_DECIMALS,
                     is_stable: true,
                     target_ratio: utils::ratio_from_percentage(50.0),
-                    min_ratio: utils::ratio_from_percentage(0.0),
-                    max_ratio: utils::ratio_from_percentage(100.0),
+                    min_ratio: utils::ratio_from_percentage(30.0),
+                    max_ratio: utils::ratio_from_percentage(60.0),
                     initial_price: utils::scale(1, USDC_DECIMALS),
                     initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
                     pricing_params: None,
                     permissions: None,
                     fees: None,
                 },
-                // Alice add 1k USDC liquidity
-                liquidity_amount: utils::scale(1_000, USDC_DECIMALS),
+                liquidity_amount: utils::scale(1_500, USDC_DECIMALS),
                 payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
             utils::SetupCustodyWithLiquidityParams {
@@ -153,97 +116,46 @@ pub async fn basic_interactions_test_suite() {
                     decimals: ETH_DECIMALS,
                     is_stable: false,
                     target_ratio: utils::ratio_from_percentage(50.0),
-                    min_ratio: utils::ratio_from_percentage(0.0),
-                    max_ratio: utils::ratio_from_percentage(100.0),
-                    initial_price: utils::scale_f64(1_676.04, ETH_DECIMALS),
+                    min_ratio: utils::ratio_from_percentage(30.0),
+                    max_ratio: utils::ratio_from_percentage(60.0),
+                    initial_price: utils::scale(1_500, ETH_DECIMALS),
                     initial_conf: utils::scale(10, ETH_DECIMALS),
                     pricing_params: None,
                     permissions: None,
                     fees: None,
                 },
-                // Martin add 1 ETH liquidity
                 liquidity_amount: utils::scale(1, ETH_DECIMALS),
-                payer: utils::copy_keypair(&keypairs[USER_MARTIN]),
+                payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
         ],
     )
     .await;
 
-    // Simple open/close position
-    {
-        // Martin: Open 50 USDC position
-        let position_pda = instructions::test_open_position(
+    // Go over 60% ratio should trigger error
+    assert_eq!(
+        instructions::test_add_liquidity(
             &mut program_test_ctx,
-            &keypairs[USER_MARTIN],
+            &keypairs[USER_ALICE],
             &keypairs[PAYER],
             &pool_pda,
             &usdc_mint,
-            OpenPositionParams {
-                // max price paid (slippage implied)
-                price: utils::scale_f64(1.05, USDC_DECIMALS),
-                collateral: utils::scale(50, USDC_DECIMALS),
-                size: utils::scale(50, USDC_DECIMALS),
-                side: Side::Long,
+            AddLiquidityParams {
+                amount: utils::scale(1_000, USDC_DECIMALS),
             },
         )
         .await
-        .unwrap()
-        .0;
+        .is_err(),
+        true,
+    );
 
-        // Martin: Close the 50 USDC position
-        instructions::test_close_position(
-            &mut program_test_ctx,
-            &keypairs[USER_MARTIN],
-            &keypairs[PAYER],
-            &pool_pda,
-            &usdc_mint,
-            &position_pda,
-            ClosePositionParams {
-                // lowest exit price paid (slippage implied)
-                price: utils::scale_f64(0.99, USDC_DECIMALS),
-            },
-        )
-        .await
-        .unwrap();
-    }
+    let alice_lp_token_mint_pda = utils::find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &lp_token_mint_pda).0;
 
-    // Simple swap
-    {
-        // Paul: Swap 150 USDC for ETH
-        instructions::test_swap(
-            &mut program_test_ctx,
-            &keypairs[USER_PAUL],
-            &keypairs[PAYER],
-            &pool_pda,
-            &eth_mint,
-            // The program receives USDC
-            &usdc_mint,
-            SwapParams {
-                amount_in: utils::scale(150, USDC_DECIMALS),
+    let alice_lp_token_account_balance =
+        utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token_mint_pda).await;
 
-                // 1% slippage
-                min_amount_out: utils::scale(150, USDC_DECIMALS)
-                    / utils::scale_f64(1_676.04, ETH_DECIMALS)
-                    * 99
-                    / 100,
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    // Remove liquidity
-    {
-        let alice_lp_token = utils::find_associated_token_account(
-            &keypairs[USER_ALICE].pubkey(),
-            &lp_token_mint_pda,
-        )
-        .0;
-
-        let alice_lp_token_balance =
-            utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token).await;
-
-        // Alice: Remove 100% of provided liquidity (1k USDC less fees)
+    // Try to remove 35% of LP token as USDC (~1,050 USDC), lowering USDC ratio to ~23%
+    // Going under 30% ratio should trigger error
+    assert_eq!(
         instructions::test_remove_liquidity(
             &mut program_test_ctx,
             &keypairs[USER_ALICE],
@@ -251,10 +163,11 @@ pub async fn basic_interactions_test_suite() {
             &pool_pda,
             &usdc_mint,
             RemoveLiquidityParams {
-                lp_amount: alice_lp_token_balance,
+                lp_amount: alice_lp_token_account_balance * 35 / 100,
             },
         )
         .await
-        .unwrap();
-    }
+        .is_err(),
+        true,
+    );
 }

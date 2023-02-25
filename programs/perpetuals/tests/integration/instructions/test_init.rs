@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{prelude::AccountMeta, ToAccountMetas},
@@ -14,7 +16,7 @@ pub async fn test_init(
     upgrade_authority: &Keypair,
     params: InitParams,
     multisig_signers: &[&Keypair],
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
     let perpetuals_program_data_pda = pda::get_program_data_pda().0;
     let (multisig_pda, multisig_bump) = pda::get_multisig_pda();
@@ -53,7 +55,7 @@ pub async fn test_init(
         Some(&upgrade_authority.pubkey()),
         &[&[upgrade_authority], multisig_signers].concat(),
     )
-    .await;
+    .await?;
 
     // ==== THEN ==============================================================
     let perpetuals_account =
@@ -99,4 +101,6 @@ pub async fn test_init(
             }
         }
     }
+
+    Ok(())
 }

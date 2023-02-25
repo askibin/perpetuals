@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{prelude::AccountMeta, ToAccountMetas},
@@ -17,12 +19,15 @@ pub async fn test_add_pool(
     payer: &Keypair,
     pool_name: &str,
     multisig_signers: &[&Keypair],
-) -> (
-    anchor_lang::prelude::Pubkey,
-    u8,
-    anchor_lang::prelude::Pubkey,
-    u8,
-) {
+) -> std::result::Result<
+    (
+        anchor_lang::prelude::Pubkey,
+        u8,
+        anchor_lang::prelude::Pubkey,
+        u8,
+    ),
+    BanksClientError,
+> {
     // ==== WHEN ==============================================================
     let multisig_pda = pda::get_multisig_pda().0;
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
@@ -71,7 +76,7 @@ pub async fn test_add_pool(
             Some(&payer.pubkey()),
             &[admin, payer, signer],
         )
-        .await;
+        .await?;
     }
 
     // ==== THEN ==============================================================
@@ -90,5 +95,5 @@ pub async fn test_add_pool(
         pool_account.inception_time
     );
 
-    (pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump)
+    Ok((pool_pda, pool_bump, lp_token_mint_pda, lp_token_mint_bump))
 }

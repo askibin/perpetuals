@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{prelude::Pubkey, ToAccountMetas},
@@ -15,7 +17,7 @@ pub async fn test_close_position(
     custody_token_mint: &Pubkey,
     position_pda: &Pubkey,
     params: ClosePositionParams,
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
 
     // Prepare PDA and addresses
@@ -60,7 +62,7 @@ pub async fn test_close_position(
         Some(&payer.pubkey()),
         &[owner, payer],
     )
-    .await;
+    .await?;
 
     // ==== THEN ==============================================================
     // Check the balance change
@@ -77,4 +79,6 @@ pub async fn test_close_position(
         assert!(owner_receiving_account_after.amount > owner_receiving_account_before.amount);
         assert!(custody_token_account_after.amount < custody_token_account_before.amount);
     }
+
+    Ok(())
 }

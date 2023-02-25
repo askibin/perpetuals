@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{
@@ -20,7 +22,7 @@ pub async fn test_set_custody_config(
     custody_pda: &Pubkey,
     params: SetCustodyConfigParams,
     multisig_signers: &[&Keypair],
-) {
+) -> std::result::Result<(), BanksClientError> {
     // ==== WHEN ==============================================================
     let multisig_pda = pda::get_multisig_pda().0;
     let multisig_account = utils::get_account::<Multisig>(program_test_ctx, multisig_pda).await;
@@ -55,7 +57,7 @@ pub async fn test_set_custody_config(
             Some(&payer.pubkey()),
             &[admin, payer, signer],
         )
-        .await;
+        .await?;
     }
 
     // ==== THEN ==============================================================
@@ -70,4 +72,6 @@ pub async fn test_set_custody_config(
         assert_eq!(custody_account.permissions, params.permissions);
         assert_eq!(custody_account.fees, params.fees);
     }
+
+    Ok(())
 }

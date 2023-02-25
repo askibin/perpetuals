@@ -1,3 +1,5 @@
+use solana_program_test::BanksClientError;
+
 use {
     crate::utils::{self, pda},
     anchor_lang::{
@@ -21,7 +23,7 @@ pub async fn test_add_custody(
     custody_token_decimals: u8,
     params: AddCustodyParams,
     multisig_signers: &[&Keypair],
-) -> (anchor_lang::prelude::Pubkey, u8) {
+) -> std::result::Result<(anchor_lang::prelude::Pubkey, u8), BanksClientError> {
     // ==== WHEN ==============================================================
     let multisig_pda = pda::get_multisig_pda().0;
     let transfer_authority_pda = pda::get_transfer_authority_pda().0;
@@ -69,7 +71,7 @@ pub async fn test_add_custody(
             Some(&payer.pubkey()),
             &[admin, payer, signer],
         )
-        .await;
+        .await?;
     }
 
     // ==== THEN ==============================================================
@@ -106,5 +108,5 @@ pub async fn test_add_custody(
         assert_eq!(pool_token.max_ratio, params.max_ratio);
     }
 
-    (custody_pda, custody_bump)
+    Ok((custody_pda, custody_bump))
 }
