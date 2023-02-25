@@ -149,45 +149,72 @@ pub async fn insuffisient_fund() {
         true,
     );
 
-    // Alice: add 10k USDC liquidity
-    instructions::test_add_liquidity(
-        &mut program_test_ctx,
-        &keypairs[USER_ALICE],
-        &keypairs[PAYER],
-        &pool_pda,
-        &usdc_mint,
-        AddLiquidityParams {
-            amount: utils::scale(10_000, USDC_DECIMALS),
-        },
-    )
-    .await
-    .unwrap();
+    // Alice: add 15k USDC and 10 ETH liquidity
+    {
+        instructions::test_add_liquidity(
+            &mut program_test_ctx,
+            &keypairs[USER_ALICE],
+            &keypairs[PAYER],
+            &pool_pda,
+            &usdc_mint,
+            AddLiquidityParams {
+                amount: utils::scale(15_000, USDC_DECIMALS),
+            },
+        )
+        .await
+        .unwrap();
+
+        instructions::test_add_liquidity(
+            &mut program_test_ctx,
+            &keypairs[USER_ALICE],
+            &keypairs[PAYER],
+            &pool_pda,
+            &eth_mint,
+            AddLiquidityParams {
+                amount: utils::scale(10, ETH_DECIMALS),
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    let alice_lp_token_mint_pda =
+        utils::find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &lp_token_mint_pda).0;
+
+    let alice_lp_token_account_balance =
+        utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token_mint_pda).await;
 
     // Trying to remove more LP token than owned should fail
-    {
-        let alice_lp_token_mint_pda = utils::find_associated_token_account(
-            &keypairs[USER_ALICE].pubkey(),
-            &lp_token_mint_pda,
+    assert_eq!(
+        instructions::test_remove_liquidity(
+            &mut program_test_ctx,
+            &keypairs[USER_ALICE],
+            &keypairs[PAYER],
+            &pool_pda,
+            &usdc_mint,
+            RemoveLiquidityParams {
+                lp_amount: alice_lp_token_account_balance + 1,
+            },
         )
-        .0;
+        .await
+        .is_err(),
+        true,
+    );
 
-        let alice_lp_token_account_balance =
-            utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token_mint_pda).await;
-
-        assert_eq!(
-            instructions::test_remove_liquidity(
-                &mut program_test_ctx,
-                &keypairs[USER_ALICE],
-                &keypairs[PAYER],
-                &pool_pda,
-                &usdc_mint,
-                RemoveLiquidityParams {
-                    lp_amount: alice_lp_token_account_balance + 1,
-                },
-            )
-            .await
-            .is_err(),
-            true,
-        );
-    }
+    // Trying to remove more asset than owned by the pool should fail
+    assert_eq!(
+        instructions::test_remove_liquidity(
+            &mut program_test_ctx,
+            &keypairs[USER_ALICE],
+            &keypairs[PAYER],
+            &pool_pda,
+            &usdc_mint,
+            RemoveLiquidityParams {
+                lp_amount: alice_lp_token_account_balance * 75 / 100,
+            },
+        )
+        .await
+        .is_err(),
+        true,
+    );
 }
