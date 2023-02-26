@@ -77,39 +77,38 @@ pub async fn fixed_fees() {
         }
     }
 
-    let (pool_pda, _, _, _, custodies_info) =
-        utils::setup_pool_with_custodies_and_liquidity(
-            &mut program_test_ctx,
-            &keypairs[MULTISIG_MEMBER_A],
-            "FOO",
-            &keypairs[PAYER],
-            multisig_signers,
-            vec![utils::SetupCustodyWithLiquidityParams {
-                setup_custody_params: utils::SetupCustodyParams {
-                    mint: usdc_mint,
-                    decimals: USDC_DECIMALS,
-                    is_stable: true,
-                    target_ratio: utils::ratio_from_percentage(50.0),
-                    min_ratio: utils::ratio_from_percentage(0.0),
-                    max_ratio: utils::ratio_from_percentage(100.0),
-                    initial_price: utils::scale(1, USDC_DECIMALS),
-                    initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
-                    pricing_params: None,
-                    permissions: None,
-                    borrow_rate: None,
-                    fees: Some(Fees {
-                        mode: FeesMode::Fixed,
-                        add_liquidity: 200,
-                        remove_liquidity: 300,
-                        protocol_share: 25,
-                        ..fixtures::fees_linear_regular()
-                    }),
-                },
-                liquidity_amount: utils::scale(0, USDC_DECIMALS),
-                payer: utils::copy_keypair(&keypairs[USER_ALICE]),
-            }],
-        )
-        .await;
+    let (pool_pda, _, _, _, custodies_info) = utils::setup_pool_with_custodies_and_liquidity(
+        &mut program_test_ctx,
+        &keypairs[MULTISIG_MEMBER_A],
+        "FOO",
+        &keypairs[PAYER],
+        multisig_signers,
+        vec![utils::SetupCustodyWithLiquidityParams {
+            setup_custody_params: utils::SetupCustodyParams {
+                mint: usdc_mint,
+                decimals: USDC_DECIMALS,
+                is_stable: true,
+                target_ratio: utils::ratio_from_percentage(50.0),
+                min_ratio: utils::ratio_from_percentage(0.0),
+                max_ratio: utils::ratio_from_percentage(100.0),
+                initial_price: utils::scale(1, USDC_DECIMALS),
+                initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
+                pricing_params: None,
+                permissions: None,
+                borrow_rate: None,
+                fees: Some(Fees {
+                    mode: FeesMode::Fixed,
+                    add_liquidity: 200,
+                    remove_liquidity: 300,
+                    protocol_share: 25,
+                    ..fixtures::fees_linear_regular()
+                }),
+            },
+            liquidity_amount: utils::scale(0, USDC_DECIMALS),
+            payer: utils::copy_keypair(&keypairs[USER_ALICE]),
+        }],
+    )
+    .await;
 
     // Check add liquidity fee
     {

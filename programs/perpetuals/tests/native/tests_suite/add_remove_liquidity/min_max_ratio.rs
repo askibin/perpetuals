@@ -151,7 +151,8 @@ pub async fn min_max_ratio() {
         true,
     );
 
-    let alice_lp_token_mint_pda = utils::find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &lp_token_mint_pda).0;
+    let alice_lp_token_mint_pda =
+        utils::find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &lp_token_mint_pda).0;
 
     let alice_lp_token_account_balance =
         utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token_mint_pda).await;

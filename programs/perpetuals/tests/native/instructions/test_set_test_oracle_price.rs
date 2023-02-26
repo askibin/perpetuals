@@ -1,5 +1,4 @@
 use {
-    solana_program_test::BanksClientError,
     crate::utils::{self, pda},
     anchor_lang::{
         prelude::{AccountMeta, Pubkey},
@@ -9,6 +8,7 @@ use {
         instructions::SetTestOraclePriceParams,
         state::{multisig::Multisig, oracle::TestOracle},
     },
+    solana_program_test::BanksClientError,
     solana_program_test::ProgramTestContext,
     solana_sdk::signer::{keypair::Keypair, Signer},
 };

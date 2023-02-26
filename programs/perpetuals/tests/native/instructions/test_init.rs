@@ -1,11 +1,11 @@
 use {
-    solana_program_test::BanksClientError,
     crate::utils::{self, pda},
     anchor_lang::{prelude::AccountMeta, ToAccountMetas},
     perpetuals::{
         instructions::InitParams,
         state::{multisig::Multisig, perpetuals::Perpetuals},
     },
+    solana_program_test::BanksClientError,
     solana_program_test::ProgramTestContext,
     solana_sdk::signer::{keypair::Keypair, Signer},
 };
