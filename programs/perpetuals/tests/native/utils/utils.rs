@@ -230,6 +230,7 @@ pub async fn create_and_execute_perpetuals_ix<T: InstructionData, U: Signers>(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn set_custody_ratios(
     program_test_ctx: &mut ProgramTestContext,
     custody_admin: &Keypair,
@@ -330,9 +331,7 @@ pub async fn setup_pool_with_custodies_and_liquidity(
     }
 
     // Set proper ratios
-    let mut idx = 0;
-
-    for params in custodies_params.as_slice() {
+    for (idx, params) in custodies_params.as_slice().iter().enumerate() {
         set_custody_ratios(
             program_test_ctx,
             admin,
@@ -344,8 +343,6 @@ pub async fn setup_pool_with_custodies_and_liquidity(
             multisig_signers,
         )
         .await;
-
-        idx += 1;
     }
 
     (
@@ -409,16 +406,16 @@ pub async fn setup_pool_with_custodies(
                 oracle: fixtures::oracle_params_regular(test_oracle_pda),
                 pricing: custody_param
                     .pricing_params
-                    .unwrap_or(fixtures::pricing_params_regular(false)),
+                    .unwrap_or_else(|| fixtures::pricing_params_regular(false)),
                 permissions: custody_param
                     .permissions
-                    .unwrap_or(fixtures::permissions_full()),
+                    .unwrap_or_else(fixtures::permissions_full),
                 fees: custody_param
                     .fees
-                    .unwrap_or(fixtures::fees_linear_regular()),
+                    .unwrap_or_else(fixtures::fees_linear_regular),
                 borrow_rate: custody_param
                     .borrow_rate
-                    .unwrap_or(fixtures::borrow_rate_regular()),
+                    .unwrap_or_else(fixtures::borrow_rate_regular),
 
                 // in BPS, 10_000 = 100%
                 target_ratio: custody_param.target_ratio,

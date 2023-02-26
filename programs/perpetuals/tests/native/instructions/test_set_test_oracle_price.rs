@@ -13,6 +13,7 @@ use {
     solana_sdk::signer::{keypair::Keypair, Signer},
 };
 
+#[allow(clippy::too_many_arguments)]
 pub async fn test_set_test_oracle_price(
     program_test_ctx: &mut ProgramTestContext,
     admin: &Keypair,

@@ -14,7 +14,7 @@ pub fn get_perpetuals_pda() -> (Pubkey, u8) {
 
 pub fn get_program_data_pda() -> (Pubkey, u8) {
     Pubkey::find_program_address(
-        &[&perpetuals::id().as_ref()],
+        &[perpetuals::id().as_ref()],
         &solana_program::bpf_loader_upgradeable::id(),
     )
 }

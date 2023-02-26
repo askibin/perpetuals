@@ -158,46 +158,40 @@ pub async fn insuffisient_fund() {
     // Swap with not enough collateral should fail
     {
         // Martin: Swap 5k USDC for ETH
-        assert_eq!(
-            instructions::test_swap(
-                &mut program_test_ctx,
-                &keypairs[USER_MARTIN],
-                &keypairs[PAYER],
-                &pool_pda,
-                &eth_mint,
-                // The program receives USDC
-                &usdc_mint,
-                SwapParams {
-                    amount_in: utils::scale(5_000, USDC_DECIMALS),
-                    min_amount_out: 0,
-                },
-            )
-            .await
-            .is_err(),
-            true,
-        );
+        assert!(instructions::test_swap(
+            &mut program_test_ctx,
+            &keypairs[USER_MARTIN],
+            &keypairs[PAYER],
+            &pool_pda,
+            &eth_mint,
+            // The program receives USDC
+            &usdc_mint,
+            SwapParams {
+                amount_in: utils::scale(5_000, USDC_DECIMALS),
+                min_amount_out: 0,
+            },
+        )
+        .await
+        .is_err());
     }
 
     // Swap for more token that the pool own should fail
     {
         // Martin: Swap 10 ETH for (15k) USDC
-        assert_eq!(
-            instructions::test_swap(
-                &mut program_test_ctx,
-                &keypairs[USER_MARTIN],
-                &keypairs[PAYER],
-                &pool_pda,
-                &usdc_mint,
-                // The program receives ETH
-                &eth_mint,
-                SwapParams {
-                    amount_in: utils::scale(10, ETH_DECIMALS),
-                    min_amount_out: 0,
-                },
-            )
-            .await
-            .is_err(),
-            true,
-        );
+        assert!(instructions::test_swap(
+            &mut program_test_ctx,
+            &keypairs[USER_MARTIN],
+            &keypairs[PAYER],
+            &pool_pda,
+            &usdc_mint,
+            // The program receives ETH
+            &eth_mint,
+            SwapParams {
+                amount_in: utils::scale(10, ETH_DECIMALS),
+                min_amount_out: 0,
+            },
+        )
+        .await
+        .is_err());
     }
 }

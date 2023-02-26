@@ -46,7 +46,7 @@ impl Pool {
         self.tokens
             .iter()
             .position(|&k| k.custody == *custody)
-            .ok_or(PerpetualsError::UnsupportedToken.into())
+            .ok_or_else(|| PerpetualsError::UnsupportedToken.into())
     }
 
     pub fn get_entry_price(

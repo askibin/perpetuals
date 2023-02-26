@@ -30,7 +30,7 @@ pub async fn test_remove_liquidity(
     let custody_pda = pda::get_custody_pda(pool_pda, custody_token_mint).0;
     let custody_token_account_pda =
         pda::get_custody_token_account_pda(pool_pda, custody_token_mint).0;
-    let lp_token_mint_pda = pda::get_lp_token_mint_pda(&pool_pda).0;
+    let lp_token_mint_pda = pda::get_lp_token_mint_pda(pool_pda).0;
 
     let receiving_account_address =
         utils::find_associated_token_account(&owner.pubkey(), custody_token_mint).0;

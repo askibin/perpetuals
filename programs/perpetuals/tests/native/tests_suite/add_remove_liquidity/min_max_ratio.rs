@@ -135,21 +135,18 @@ pub async fn min_max_ratio() {
     .await;
 
     // Go over 60% ratio should trigger error
-    assert_eq!(
-        instructions::test_add_liquidity(
-            &mut program_test_ctx,
-            &keypairs[USER_ALICE],
-            &keypairs[PAYER],
-            &pool_pda,
-            &usdc_mint,
-            AddLiquidityParams {
-                amount: utils::scale(1_000, USDC_DECIMALS),
-            },
-        )
-        .await
-        .is_err(),
-        true,
-    );
+    assert!(instructions::test_add_liquidity(
+        &mut program_test_ctx,
+        &keypairs[USER_ALICE],
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_mint,
+        AddLiquidityParams {
+            amount: utils::scale(1_000, USDC_DECIMALS),
+        },
+    )
+    .await
+    .is_err());
 
     let alice_lp_token_mint_pda =
         utils::find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &lp_token_mint_pda).0;
@@ -159,19 +156,16 @@ pub async fn min_max_ratio() {
 
     // Try to remove 35% of LP token as USDC (~1,050 USDC), lowering USDC ratio to ~23%
     // Going under 30% ratio should trigger error
-    assert_eq!(
-        instructions::test_remove_liquidity(
-            &mut program_test_ctx,
-            &keypairs[USER_ALICE],
-            &keypairs[PAYER],
-            &pool_pda,
-            &usdc_mint,
-            RemoveLiquidityParams {
-                lp_amount: alice_lp_token_account_balance * 35 / 100,
-            },
-        )
-        .await
-        .is_err(),
-        true,
-    );
+    assert!(instructions::test_remove_liquidity(
+        &mut program_test_ctx,
+        &keypairs[USER_ALICE],
+        &keypairs[PAYER],
+        &pool_pda,
+        &usdc_mint,
+        RemoveLiquidityParams {
+            lp_amount: alice_lp_token_account_balance * 35 / 100,
+        },
+    )
+    .await
+    .is_err());
 }

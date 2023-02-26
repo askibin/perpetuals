@@ -92,11 +92,8 @@ pub async fn test_init(
 
         // Check signers
         {
-            let mut i = 0;
-            for signer in multisig_signers {
+            for (i, signer) in multisig_signers.iter().enumerate() {
                 assert_eq!(multisig_account.signers[i], signer.pubkey());
-
-                i += 1;
             }
         }
     }
