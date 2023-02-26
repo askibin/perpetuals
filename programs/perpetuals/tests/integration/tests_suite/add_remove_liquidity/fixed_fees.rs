@@ -96,6 +96,7 @@ pub async fn fixed_fees() {
                     initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
                     pricing_params: None,
                     permissions: None,
+                    borrow_rate: None,
                     fees: Some(Fees {
                         mode: FeesMode::Fixed,
                         add_liquidity: 200,

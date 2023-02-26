@@ -143,6 +143,7 @@ pub async fn basic_interactions() {
                     pricing_params: None,
                     permissions: None,
                     fees: None,
+                    borrow_rate: None,
                 },
                 // Alice: add 1k USDC liquidity
                 liquidity_amount: utils::scale(1_000, USDC_DECIMALS),
@@ -161,6 +162,7 @@ pub async fn basic_interactions() {
                     pricing_params: None,
                     permissions: None,
                     fees: None,
+                    borrow_rate: None,
                 },
                 // Martin: add 1 ETH liquidity
                 liquidity_amount: utils::scale(1, ETH_DECIMALS),

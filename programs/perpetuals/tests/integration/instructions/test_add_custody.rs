@@ -1,5 +1,4 @@
 use {
-    solana_program_test::BanksClientError,
     crate::utils::{self, pda},
     anchor_lang::{
         prelude::{AccountMeta, Pubkey},
@@ -9,6 +8,7 @@ use {
         instructions::AddCustodyParams,
         state::{custody::Custody, multisig::Multisig, pool::Pool},
     },
+    solana_program_test::BanksClientError,
     solana_program_test::ProgramTestContext,
     solana_sdk::signer::{keypair::Keypair, Signer},
 };
@@ -87,6 +87,7 @@ pub async fn test_add_custody(
         assert_eq!(custody_account.pricing, params.pricing);
         assert_eq!(custody_account.permissions, params.permissions);
         assert_eq!(custody_account.fees, params.fees);
+        assert_eq!(custody_account.borrow_rate, params.borrow_rate,);
         assert_eq!(custody_account.bump, custody_bump);
         assert_eq!(
             custody_account.token_account_bump,

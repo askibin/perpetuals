@@ -1,3 +1,5 @@
+use perpetuals::state::custody::BorrowRateParams;
+
 use {
     super::{fixtures, get_program_data_pda, get_test_oracle_account},
     crate::instructions,
@@ -252,6 +254,7 @@ pub async fn set_custody_ratios(
             pricing: custody_account.pricing,
             permissions: custody_account.permissions,
             fees: custody_account.fees,
+            borrow_rate: custody_account.borrow_rate,
             target_ratio,
             min_ratio,
             max_ratio,
@@ -367,6 +370,7 @@ pub struct SetupCustodyParams {
     pub pricing_params: Option<PricingParams>,
     pub permissions: Option<Permissions>,
     pub fees: Option<Fees>,
+    pub borrow_rate: Option<BorrowRateParams>,
 }
 
 #[derive(Clone, Copy)]
@@ -412,6 +416,9 @@ pub async fn setup_pool_with_custodies(
                 fees: custody_param
                     .fees
                     .unwrap_or(fixtures::fees_linear_regular()),
+                borrow_rate: custody_param
+                    .borrow_rate
+                    .unwrap_or(fixtures::borrow_rate_regular()),
 
                 // in BPS, 10_000 = 100%
                 target_ratio: custody_param.target_ratio,

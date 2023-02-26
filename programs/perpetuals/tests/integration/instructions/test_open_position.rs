@@ -87,7 +87,6 @@ pub async fn test_open_position(
 
     // Check the position
     {
-        let custody_account = utils::get_account::<Custody>(program_test_ctx, custody_pda).await;
         let position_account = utils::get_account::<Position>(program_test_ctx, position_pda).await;
         let perpetuals_account =
             utils::get_account::<Perpetuals>(program_test_ctx, perpetuals_pda).await;
@@ -103,10 +102,6 @@ pub async fn test_open_position(
         assert_eq!(position_account.side, params.side);
         assert_eq!(position_account.unrealized_profit_usd, 0);
         assert_eq!(position_account.unrealized_loss_usd, 0);
-        assert_eq!(
-            position_account.borrow_rate_sum,
-            custody_account.borrow_rate_sum
-        );
         assert_eq!(position_account.collateral_amount, params.collateral);
         assert_eq!(position_account.bump, position_bump);
     }

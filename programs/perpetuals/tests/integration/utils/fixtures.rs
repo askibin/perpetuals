@@ -2,6 +2,7 @@
 
 use {
     anchor_lang::prelude::Pubkey,
+    perpetuals::state::custody::BorrowRateParams,
     perpetuals::{
         instructions::InitParams,
         state::{
@@ -22,6 +23,15 @@ pub fn permissions_full() -> Permissions {
         allow_pnl_withdrawal: true,
         allow_collateral_withdrawal: true,
         allow_size_change: true,
+    }
+}
+
+pub fn borrow_rate_regular() -> BorrowRateParams {
+    BorrowRateParams {
+        base_rate: 0,
+        slope1: 80_000,
+        slope2: 120_000,
+        optimal_utilization: 800_000_000,
     }
 }
 
