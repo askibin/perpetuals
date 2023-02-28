@@ -70,7 +70,9 @@ pub async fn basic_interactions() {
 
     // Initialize and fund associated token accounts
     {
-        // Alice: mint 1k USDC
+        let lm_token_mint = utils::pda::get_lm_token_mint_pda().0;
+
+        // Alice: mint 1k USDC, create LM token account
         {
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
@@ -80,9 +82,16 @@ pub async fn basic_interactions() {
                 utils::scale(1_000, USDC_DECIMALS),
             )
             .await;
+
+            utils::initialize_token_account(
+                &mut program_test_ctx,
+                &lm_token_mint,
+                &keypairs[USER_ALICE].pubkey(),
+            )
+            .await;
         }
 
-        // Martin: mint 100 USDC and 2 ETH
+        // Martin: mint 100 USDC and 2 ETH, create LM token account
         {
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
@@ -101,9 +110,16 @@ pub async fn basic_interactions() {
                 utils::scale(2, ETH_DECIMALS),
             )
             .await;
+
+            utils::initialize_token_account(
+                &mut program_test_ctx,
+                &lm_token_mint,
+                &keypairs[USER_MARTIN].pubkey(),
+            )
+            .await;
         }
 
-        // Paul: mint 150 USDC
+        // Paul: mint 150 USDC, create LM token account
         {
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
@@ -117,6 +133,13 @@ pub async fn basic_interactions() {
             utils::initialize_token_account(
                 &mut program_test_ctx,
                 &eth_mint,
+                &keypairs[USER_PAUL].pubkey(),
+            )
+            .await;
+
+            utils::initialize_token_account(
+                &mut program_test_ctx,
+                &lm_token_mint,
                 &keypairs[USER_PAUL].pubkey(),
             )
             .await;
