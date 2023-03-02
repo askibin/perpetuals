@@ -5,3 +5,8 @@ target
 **/*.rs.bk
 node_modules
 test-ledger
+
+
+## Dapp
+*/**/.svelte-kit
+*/**/node_modules
