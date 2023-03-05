@@ -190,7 +190,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     position.owner = ctx.accounts.owner.key();
     position.pool = pool.key();
     position.custody = custody.key();
-    position.open_time = perpetuals.get_time()?;
+    position.open_time = curtime;
     position.update_time = 0;
     position.side = params.side;
     position.price = position_price;

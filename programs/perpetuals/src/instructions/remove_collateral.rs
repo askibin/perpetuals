@@ -159,7 +159,7 @@ pub fn remove_collateral(
 
     // update existing position
     msg!("Update existing position");
-    position.update_time = perpetuals.get_time()?;
+    position.update_time = curtime;
     position.collateral_usd = math::checked_sub(position.collateral_usd, params.collateral_usd)?;
     position.collateral_amount = math::checked_sub(position.collateral_amount, collateral)?;
 

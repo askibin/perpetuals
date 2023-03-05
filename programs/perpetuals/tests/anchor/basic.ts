@@ -456,12 +456,37 @@ describe("perpetuals", () => {
 
   it("addCollateral", async () => {
     await tc.addCollateral(
+      125,
       tc.toTokenAmount(1, tc.custodies[0].decimals),
+      tc.toTokenAmount(2, tc.custodies[0].decimals),
       tc.users[0],
       tc.users[0].tokenAccounts[0],
       tc.users[0].positionAccountsLong[0],
       tc.custodies[0]
     );
+
+    let position = await tc.program.account.position.fetch(
+      tc.users[0].positionAccountsLong[0]
+    );
+    positionExpected = {
+      owner: tc.users[0].wallet.publicKey.toBase58(),
+      pool: tc.pool.publicKey.toBase58(),
+      custody: tc.custodies[0].custody.toBase58(),
+      openTime: "111",
+      updateTime: "111",
+      side: { long: {} },
+      price: "124230000",
+      sizeUsd: "1107000000",
+      collateralUsd: "246000000",
+      unrealizedProfitUsd: "0",
+      unrealizedLossUsd: "0",
+      cumulativeInterestSnapshot: "0",
+      lockedAmount: "9000000000",
+      collateralAmount: "2000000000",
+      bump: position.bump,
+    };
+    console.log({ position });
+    expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
   it("removeCollateral", async () => {
