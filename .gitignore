@@ -6,7 +6,7 @@ target
 node_modules
 test-ledger
 
-
+.env
 ## Dapp
 */**/.svelte-kit
 */**/node_modules
