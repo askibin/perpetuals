@@ -485,7 +485,6 @@ describe("perpetuals", () => {
       collateralAmount: "2000000000",
       bump: position.bump,
     };
-    console.log({ position });
     expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
