@@ -1,77 +1,55 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 
 	import Header from '../components/header.svelte';
+	import { SvelteToast } from '@zerodevx/svelte-toast';
+	import { Metaplex } from '@metaplex-foundation/js';
+	import * as metadata from '@metaplex-foundation/mpl-token-metadata';
 
 	import '../app.css';
 	import { WalletMultiButton } from '@svelte-on-solana/wallet-adapter-ui';
+	import { tokensStore, type Tokens } from '../helpers/globalStore';
+	import {
+		getConnection,
+		getTokenMetaDataFromSolanaFM,
+		getTokenMetaDataFromSolScan
+	} from '../helpers';
+	import { PublicKey } from '@solana/web3.js';
 
-	const actions = [
-		{
-			name: 'Long',
-			path: '/long'
-		},
-		{
-			name: 'Short',
-			path: '/short'
-		},
-		{
-			name: 'Swap',
-			path: '/swap'
-		},
-		{
-			name: 'Earn',
-			path: '/earn'
-		}
-	];
+	const tokenAddresses = ['DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'];
+	onMount(async () => {
+		const allTokens = await Promise.all(
+			tokenAddresses.map((address) => {
+				return getTokenMetaDataFromSolanaFM(address);
+			})
+		);
+		tokensStore.set(allTokens);
+	});
+
+	const toastOptions = {
+		reversed: true
+	};
 </script>
 
-<div>
+<div class="contaniner flex flex-col gap-20">
 	<Header />
 	<div>
 		<div class="wrapper-app">
-			<div>
-				<WalletMultiButton />
-			</div>
-			<div class="title">
-				<h1 class="text-8xl sky-300 font-pixel">SANDBLIZZARD</h1>
-				<h2 class="text-4xl sky-300 font-pixel">PERPETUAL DEX</h2>
-			</div>
-
 			<div class=" container mx-auto flex flex-col m-6">
-				<div
-					class={`container box ${$page.route.id.replace(
-						'/',
-						''
-					)}-border mx-auto py-4 max-w-xs bg-slate-900  justify-items-center items-center px-5 rounded-md`}
-				>
-					<div class="flex flex-col gap-5">
-						<div class=" flex flex-row justify-center">
-							<div class="container flex flex-row bg-black justify-center ext-8xl sky-300">
-								{#each actions as action}
-									<div class="py-2">
-										<a
-											class={`px-4 py-2 rounded-base text-sm font-pixel ${
-												$page.route.id === action.path ? 'active-action' : ''
-											}`}
-											href={action.path}>{action.name}</a
-										>
-									</div>
-								{/each}
-							</div>
-							<div class="w-12 flex justify-center">
-								<img class="cursor-pointer" height="10px" width="auto" src="drop.png" />
-							</div>
-						</div>
-						<slot />
-					</div>
-				</div>
+				<slot />
 			</div>
 		</div>
 	</div>
+	<SvelteToast options={toastOptions} />
 </div>
 
 <style style="postcss">
+	:root {
+		--toastContainerTop: auto;
+		--toastContainerRight: 0;
+		--toastContainerBottom: 4rem;
+	}
+
 	:global(body) {
 		margin: 0;
 		background-color: #000000;
@@ -92,11 +70,11 @@
 			background-position: 400% 400%;
 		}
 	}
-	.box {
+	:global(.box) {
 		position: relative;
 		display: block;
 	}
-	.long-border:before {
+	:global(.long-border:before) {
 		content: '';
 		position: absolute;
 		border-radius: 5px;
@@ -110,7 +88,7 @@
 		animation: glower 10s linear infinite;
 	}
 
-	.short-border:before {
+	:global(.short-border:before) {
 		content: '';
 		position: absolute;
 		border-radius: 5px;
@@ -124,7 +102,7 @@
 		animation: glower 10s linear infinite;
 	}
 
-	.swap-border:before {
+	:global(.swap-border:before) {
 		content: '';
 		position: absolute;
 		border-radius: 5px;
@@ -143,7 +121,7 @@
 		font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
 	}
 
-	.active-action {
+	:global(.active-action) {
 		background-color: white;
 		color: blue;
 	}
