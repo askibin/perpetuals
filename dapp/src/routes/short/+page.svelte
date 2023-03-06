@@ -66,7 +66,7 @@
 					{/each}
 				</div>
 				<div class="w-12 flex justify-center">
-					<img class="cursor-pointer" height="10px" width="auto" src="drop.png" />
+					<img class="cursor-pointer" height="10px" width="auto" src="drop.png" alt="drop" />
 				</div>
 			</div>
 			<div class="container flex flex-col gap-5">
@@ -122,7 +122,7 @@
 								bind:value={leverage}
 								name="amount"
 								type="text"
-								class="px-3 text-base rounded font-pixel text-lg outline-none w-14 text-left bg-slate-800  placeholder-shown:border-gray-500"
+								class="px-3 text-base rounded font-pixel outline-none w-14 text-left bg-slate-800  placeholder-shown:border-gray-500"
 							/>
 							<div class="input-x" />
 						</div>

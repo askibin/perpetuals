@@ -1,6 +1,7 @@
 import * as web3 from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import { BigNumber as BN } from 'bignumber.js';
+
 const getHeliusRPC = (cluster: web3.Cluster): string => {
 	switch (cluster) {
 		case 'mainnet-beta':
@@ -16,7 +17,7 @@ const getHeliusAPI = (path?: string): string => {
 	return `https://api.helius.xyz/${path}?api-key=${process.env.HELIUS_API_KEY}`;
 };
 
-export const getConnection = (cluster: web3.Cluster = 'mainnet-beta') =>
+export const getConnection = (cluster: web3.Cluster = 'mainnet-beta'): web3.Connection =>
 	new web3.Connection(getHeliusRPC(cluster), 'confirmed');
 
 /**

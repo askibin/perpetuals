@@ -63,7 +63,7 @@
 		}}
 		class={`flex items-center gap-2 ${showTokenDropdown ? 'hidden' : ''}`}
 	>
-		<img class="w-5" src={selectedToken?.icon} />
+		<img class="w-5" src={selectedToken?.icon} alt="selected token icon" />
 		<p>{selectedToken?.symbol}</p>
 	</button>
 	<div class="flex flex-col">
