@@ -1,6 +1,7 @@
 use {
     crate::utils::{self, pda},
     anchor_lang::{prelude::Pubkey, ToAccountMetas},
+    bonfida_test_utils::ProgramTestContextExt,
     perpetuals::state::custody::Custody,
     perpetuals::{instructions::LiquidateParams, state::position::Position},
     solana_program_test::BanksClientError,
@@ -39,6 +40,20 @@ pub async fn test_liquidate(
     let custody_account = utils::get_account::<Custody>(program_test_ctx, custody_pda).await;
     let custody_oracle_account_address = custody_account.oracle.oracle_account;
 
+    // Save account state before tx execution
+    let receiving_account_before = program_test_ctx
+        .get_token_account(receiving_account_address)
+        .await
+        .unwrap();
+    let custody_token_account_before = program_test_ctx
+        .get_token_account(custody_token_account_pda)
+        .await
+        .unwrap();
+    let rewards_receiving_account_before = program_test_ctx
+        .get_token_account(rewards_receiving_account_address)
+        .await
+        .unwrap();
+
     utils::create_and_execute_perpetuals_ix(
         program_test_ctx,
         perpetuals::accounts::Liquidate {
@@ -64,5 +79,25 @@ pub async fn test_liquidate(
     .await?;
 
     // ==== THEN ==============================================================
+    // Check the balance change
+    {
+        let receiving_account_after = program_test_ctx
+            .get_token_account(receiving_account_address)
+            .await
+            .unwrap();
+        let custody_token_account_after = program_test_ctx
+            .get_token_account(custody_token_account_pda)
+            .await
+            .unwrap();
+        let rewards_receiving_account_after = program_test_ctx
+            .get_token_account(rewards_receiving_account_address)
+            .await
+            .unwrap();
+
+        assert!(receiving_account_after.amount >= receiving_account_before.amount);
+        assert!(custody_token_account_after.amount <= custody_token_account_before.amount);
+        assert!(rewards_receiving_account_after.amount > rewards_receiving_account_before.amount);
+    }
+
     Ok(())
 }

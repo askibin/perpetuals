@@ -177,7 +177,7 @@ pub async fn liquidate_position() {
     .unwrap()
     .0;
 
-    // Makes ETH price to drop 50%
+    // Makes ETH price to drop 10%
     {
         let eth_test_oracle_pda = custodies_infos[1].test_oracle_pda;
         let eth_custody_pda = custodies_infos[1].custody_pda;
@@ -192,7 +192,7 @@ pub async fn liquidate_position() {
             &eth_custody_pda,
             &eth_test_oracle_pda,
             SetTestOraclePriceParams {
-                price: utils::scale(750, ETH_DECIMALS),
+                price: utils::scale(1_350, ETH_DECIMALS),
                 expo: -(ETH_DECIMALS as i32),
                 conf: utils::scale(10, ETH_DECIMALS),
                 publish_time,
