@@ -159,23 +159,13 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     }
 
     // compute fee
-    let mut fee_amount = pool.get_entry_fee(
+    let fee_amount = pool.get_entry_fee(
         token_id,
         params.collateral,
         params.size,
         custody,
         &token_price,
     )?;
-    // collect interest fee and reset cumulative_interest_snapshot
-    if params.size > 0 {
-        let interest_usd = custody.get_interest_amount_usd(position, curtime)?;
-        let interest_amount = token_price.get_token_amount(interest_usd, custody.decimals)?;
-
-        fee_amount = fee_amount + interest_amount;
-        // remove position here cause borrow fees collected
-        // will be reopen later
-        custody.remove_position(position, curtime)?;
-    }
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
@@ -205,6 +195,15 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     position.update_time = curtime;
 
     if params.size > 0 {
+        // calculate interest fee and reset cumulative_interest_snapshot
+        let interest_usd = custody.get_interest_amount_usd(position, curtime)?;
+        position.unrealized_loss_usd =
+            math::checked_add(position.unrealized_loss_usd, interest_usd)?;
+        position.cumulative_interest_snapshot = custody.get_cumulative_interest(curtime)?;
+        // remove position here cause borrow fees collected
+        // will be reopen later
+        custody.remove_position(position, curtime)?;
+
         // (current size * price + new size * new price) /
         position.price = math::checked_as_u64(math::checked_div(
             math::checked_add(
@@ -216,14 +215,10 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
         position.size_usd = math::checked_add(position.size_usd, size_usd)?;
         position.locked_amount =
             math::checked_add(position.locked_amount, additional_locked_amount)?;
-        position.cumulative_interest_snapshot = custody.get_cumulative_interest(curtime)?;
     }
 
-    if params.collateral > 0 {
-        position.collateral_usd = math::checked_add(position.collateral_usd, collateral_usd)?;
-        position.collateral_amount =
-            math::checked_add(position.collateral_amount, params.collateral)?;
-    }
+    position.collateral_usd = math::checked_add(position.collateral_usd, collateral_usd)?;
+    position.collateral_amount = math::checked_add(position.collateral_amount, params.collateral)?;
 
     // check position risk
     msg!("Check position risks");

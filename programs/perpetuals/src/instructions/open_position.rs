@@ -186,6 +186,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     msg!("Initialize new position");
     let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
     let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
+    msg!("Collateral added in USD: {}", collateral_usd);
 
     position.owner = ctx.accounts.owner.key();
     position.pool = pool.key();
