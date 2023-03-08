@@ -5,9 +5,7 @@ use {
     },
     bonfida_test_utils::ProgramTestExt,
     perpetuals::{
-        instructions::{
-            ClosePositionParams, OpenPositionParams, RemoveLiquidityParams, SwapParams,
-        },
+        instructions::{OpenPositionParams, SetTestOraclePriceParams},
         state::position::Side,
     },
     solana_program_test::ProgramTest,
@@ -22,14 +20,14 @@ const MULTISIG_MEMBER_C: usize = 4;
 const PAYER: usize = 5;
 const USER_ALICE: usize = 6;
 const USER_MARTIN: usize = 7;
-const USER_PAUL: usize = 8;
+const USER_EXECUTIONER: usize = 8;
 
 const KEYPAIRS_COUNT: usize = 9;
 
 const USDC_DECIMALS: u8 = 6;
 const ETH_DECIMALS: u8 = 9;
 
-pub async fn basic_interactions() {
+pub async fn liquidate_position() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
@@ -69,29 +67,29 @@ pub async fn basic_interactions() {
 
     // Initialize and fund associated token accounts
     {
-        // Alice: mint 1k USDC
+        // Alice: mint 200k USDC and 100 ETH
         {
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
                 &usdc_mint,
                 &keypairs[USER_ALICE].pubkey(),
                 &keypairs[ROOT_AUTHORITY],
-                utils::scale(1_000, USDC_DECIMALS),
+                utils::scale(200_000, USDC_DECIMALS),
+            )
+            .await;
+
+            utils::initialize_and_fund_token_account(
+                &mut program_test_ctx,
+                &eth_mint,
+                &keypairs[USER_ALICE].pubkey(),
+                &keypairs[ROOT_AUTHORITY],
+                utils::scale(100, ETH_DECIMALS),
             )
             .await;
         }
 
-        // Martin: mint 100 USDC and 2 ETH
+        // Martin: mint 2 ETH
         {
-            utils::initialize_and_fund_token_account(
-                &mut program_test_ctx,
-                &usdc_mint,
-                &keypairs[USER_MARTIN].pubkey(),
-                &keypairs[ROOT_AUTHORITY],
-                utils::scale(100, USDC_DECIMALS),
-            )
-            .await;
-
             utils::initialize_and_fund_token_account(
                 &mut program_test_ctx,
                 &eth_mint,
@@ -102,27 +100,18 @@ pub async fn basic_interactions() {
             .await;
         }
 
-        // Paul: mint 150 USDC
+        // Executioner: init ETH token account
         {
-            utils::initialize_and_fund_token_account(
-                &mut program_test_ctx,
-                &usdc_mint,
-                &keypairs[USER_PAUL].pubkey(),
-                &keypairs[ROOT_AUTHORITY],
-                utils::scale(150, USDC_DECIMALS),
-            )
-            .await;
-
             utils::initialize_token_account(
                 &mut program_test_ctx,
                 &eth_mint,
-                &keypairs[USER_PAUL].pubkey(),
+                &keypairs[USER_EXECUTIONER].pubkey(),
             )
             .await;
         }
     }
 
-    let (pool_pda, _, lp_token_mint_pda, _, _) = utils::setup_pool_with_custodies_and_liquidity(
+    let (pool_pda, _, _, _, custodies_infos) = utils::setup_pool_with_custodies_and_liquidity(
         &mut program_test_ctx,
         &keypairs[MULTISIG_MEMBER_A],
         "FOO",
@@ -144,8 +133,7 @@ pub async fn basic_interactions() {
                     fees: None,
                     borrow_rate: None,
                 },
-                // Alice: add 1k USDC liquidity
-                liquidity_amount: utils::scale(1_000, USDC_DECIMALS),
+                liquidity_amount: utils::scale(150_000, USDC_DECIMALS),
                 payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
             utils::SetupCustodyWithLiquidityParams {
@@ -163,100 +151,67 @@ pub async fn basic_interactions() {
                     fees: None,
                     borrow_rate: None,
                 },
-                // Martin: add 1 ETH liquidity
-                liquidity_amount: utils::scale(1, ETH_DECIMALS),
-                payer: utils::copy_keypair(&keypairs[USER_MARTIN]),
+                liquidity_amount: utils::scale(100, ETH_DECIMALS),
+                payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
         ],
     )
     .await;
 
-    // Simple open/close position
-    {
-        // Martin: Open 0.1 ETH position
-        let position_pda = instructions::test_open_position(
-            &mut program_test_ctx,
-            &keypairs[USER_MARTIN],
-            &keypairs[PAYER],
-            &pool_pda,
-            &eth_mint,
-            OpenPositionParams {
-                // max price paid (slippage implied)
-                price: utils::scale(1_550, ETH_DECIMALS),
-                collateral: utils::scale_f64(0.1, ETH_DECIMALS),
-                size: utils::scale_f64(0.1, ETH_DECIMALS),
-                side: Side::Long,
-            },
-        )
-        .await
-        .unwrap()
-        .0;
+    // Martin: Open 1 ETH long position x5
+    let position_pda = instructions::test_open_position(
+        &mut program_test_ctx,
+        &keypairs[USER_MARTIN],
+        &keypairs[PAYER],
+        &pool_pda,
+        &eth_mint,
+        OpenPositionParams {
+            // max price paid (slippage implied)
+            price: utils::scale(1_550, ETH_DECIMALS),
+            collateral: utils::scale(1, ETH_DECIMALS),
+            size: utils::scale(5, ETH_DECIMALS),
+            side: Side::Long,
+        },
+    )
+    .await
+    .unwrap()
+    .0;
 
-        // Martin: Close the ETH position
-        instructions::test_close_position(
+    // Makes ETH price to drop 50%
+    {
+        let eth_test_oracle_pda = custodies_infos[1].test_oracle_pda;
+        let eth_custody_pda = custodies_infos[1].custody_pda;
+
+        let publish_time = utils::get_current_unix_timestamp(&mut program_test_ctx).await;
+
+        instructions::test_set_test_oracle_price(
             &mut program_test_ctx,
-            &keypairs[USER_MARTIN],
+            &keypairs[MULTISIG_MEMBER_A],
             &keypairs[PAYER],
             &pool_pda,
-            &eth_mint,
-            &position_pda,
-            ClosePositionParams {
-                // lowest exit price paid (slippage implied)
-                price: utils::scale(1_450, USDC_DECIMALS),
+            &eth_custody_pda,
+            &eth_test_oracle_pda,
+            SetTestOraclePriceParams {
+                price: utils::scale(750, ETH_DECIMALS),
+                expo: -(ETH_DECIMALS as i32),
+                conf: utils::scale(10, ETH_DECIMALS),
+                publish_time,
             },
+            multisig_signers,
         )
         .await
         .unwrap();
     }
 
-    // Simple swap
-    {
-        // Paul: Swap 150 USDC for ETH
-        instructions::test_swap(
-            &mut program_test_ctx,
-            &keypairs[USER_PAUL],
-            &keypairs[PAYER],
-            &pool_pda,
-            &eth_mint,
-            // The program receives USDC
-            &usdc_mint,
-            SwapParams {
-                amount_in: utils::scale(150, USDC_DECIMALS),
-
-                // 1% slippage
-                min_amount_out: utils::scale(150, USDC_DECIMALS)
-                    / utils::scale(1_500, ETH_DECIMALS)
-                    * 99
-                    / 100,
-            },
-        )
-        .await
-        .unwrap();
-    }
-
-    // Remove liquidity
-    {
-        let alice_lp_token = utils::find_associated_token_account(
-            &keypairs[USER_ALICE].pubkey(),
-            &lp_token_mint_pda,
-        )
-        .0;
-
-        let alice_lp_token_balance =
-            utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token).await;
-
-        // Alice: Remove 100% of provided liquidity (1k USDC less fees)
-        instructions::test_remove_liquidity(
-            &mut program_test_ctx,
-            &keypairs[USER_ALICE],
-            &keypairs[PAYER],
-            &pool_pda,
-            &usdc_mint,
-            RemoveLiquidityParams {
-                lp_amount: alice_lp_token_balance,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    // Executioner: Liquidate Martin ETH position
+    instructions::test_liquidate(
+        &mut program_test_ctx,
+        &keypairs[USER_EXECUTIONER],
+        &keypairs[PAYER],
+        &pool_pda,
+        &eth_mint,
+        &position_pda,
+    )
+    .await
+    .unwrap();
 }
