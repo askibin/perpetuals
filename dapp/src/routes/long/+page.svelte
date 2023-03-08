@@ -10,6 +10,7 @@
 	import { page } from '$app/stores';
 	import { prettyAmount } from '../../helpers';
 	import { actions } from '../../types';
+	import Quote from '../../components/quote.svelte';
 
 	// Input
 	let leverage = 15;
@@ -151,29 +152,7 @@
 	</div>
 	<div use:autoAnimate={{ duration: 200 }}>
 		{#if showQuote}
-			<div
-				class="container mx-auto py-4 max-w-xs bg-slate-900  justify-items-left items-left px-5 rounded-md flex flex-col gap-2"
-			>
-				<h3 class="text-xl font-pixel ">Long position</h3>
-				<div class="flex flex-col gap-1">
-					<div class="flex flex-row justify-between">
-						<p class="text-base font-pixel">Entry price</p>
-						<p class="text-base font-pixel">{`$${prettyAmount(baseTokenAmount)}`}</p>
-					</div>
-					<div class="flex flex-row justify-between">
-						<p class="text-base font-pixel">Exit price</p>
-						<p class="text-base font-pixel">{`$${prettyAmount(baseTokenAmount)}`}</p>
-					</div>
-					<div class="flex flex-row justify-between">
-						<p class="text-base font-pixel">Borrow fee</p>
-						<p class="text-base font-pixel">{`${borrowFeePerHr}% / 1hr`}</p>
-					</div>
-					<div class="flex flex-row justify-between">
-						<p class="text-base font-pixel">Available liquidity</p>
-						<p class="text-base font-pixel">{`$${prettyAmount(availableLiquidityUSD)}`}</p>
-					</div>
-				</div>
-			</div>
+			<Quote {baseTokenAmount} {borrowFeePerHr} {availableLiquidityUSD} />
 		{/if}
 	</div>
 </div>

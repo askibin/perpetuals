@@ -1,6 +1,8 @@
 import * as web3 from '@solana/web3.js';
 import * as spl from '@solana/spl-token';
 import { BigNumber as BN } from 'bignumber.js';
+export const LP_TOKEN_ADDRESSES = ['123'];
+
 const getHeliusRPC = (cluster: web3.Cluster): string => {
 	switch (cluster) {
 		case 'mainnet-beta':
