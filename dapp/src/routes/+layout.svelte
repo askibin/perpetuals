@@ -9,21 +9,36 @@
 	import '../app.css';
 	import { WalletMultiButton } from '@svelte-on-solana/wallet-adapter-ui';
 	import { tokensStore, type Tokens } from '../helpers/globalStore';
-	import {
-		getConnection,
-		getTokenMetaDataFromSolanaFM,
-		getTokenMetaDataFromSolScan
-	} from '../helpers';
-	import { PublicKey } from '@solana/web3.js';
+	import { getTokenMetaDataFromSolanaFM, LP_TOKEN_ADDRESSES } from '../helpers';
 
+	// Start with whitelist of tokens to search for
 	const tokenAddresses = ['DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'];
+
 	onMount(async () => {
 		const allTokens = await Promise.all(
 			tokenAddresses.map((address) => {
 				return getTokenMetaDataFromSolanaFM(address);
 			})
 		);
-		tokensStore.set(allTokens);
+		const lpTokens = await Promise.all(
+			LP_TOKEN_ADDRESSES.map((address) => {
+				return {
+					address,
+					amount: 0,
+					priceUSD: 1,
+					symbol: 'SAND',
+					name: 'BLIZZARD SAND LP TOKEN',
+					icon: '',
+					website: '',
+					twitter: '',
+					tag: [],
+					decimals: 6,
+					coingeckoId: '',
+					holder: 0
+				};
+			})
+		);
+		tokensStore.set([...allTokens, ...lpTokens]);
 	});
 
 	const toastOptions = {
@@ -109,6 +124,20 @@
 		left: -2px;
 		top: -2px;
 		background: linear-gradient(45deg, transparent, blue, transparent);
+		background-size: 400%;
+		width: calc(100% + 5px);
+		height: calc(100% + 5px);
+		z-index: -1;
+		animation: glower 10s linear infinite;
+	}
+
+	:global(.earn-border:before) {
+		content: '';
+		position: absolute;
+		border-radius: 5px;
+		left: -2px;
+		top: -2px;
+		background: linear-gradient(45deg, transparent, pink, transparent);
 		background-size: 400%;
 		width: calc(100% + 5px);
 		height: calc(100% + 5px);

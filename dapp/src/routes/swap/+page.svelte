@@ -82,7 +82,7 @@
 				<div class="container max-w-lg">
 					<div class="container flex flex-col j">
 						<div class="container flex flex-row justify-between ">
-							<p class="text-base">Select base token</p>
+							<p class="text-base">You pay</p>
 							{#if $walletStore.connected && selectedBaseToken?.symbol}
 								<div class="flex flex-row items-center gap-1">
 									<p class="text-base">{defaultTokenBalance}</p>
@@ -102,7 +102,7 @@
 				<div class="container max-w-lg">
 					<div class="container flex flex-col j">
 						<div class="container flex flex-row justify-between ">
-							<p class="text-base">You long position</p>
+							<p class="text-base">You receive</p>
 						</div>
 
 						<TokenInput
@@ -113,34 +113,10 @@
 						/>
 					</div>
 				</div>
-
-				<div class="container max-w-lg z-1">
-					<div class=" z-1 container flex flex-row justify-between items-center gap-2 ">
-						<Slider
-							class="z-1"
-							bind:value={leverage}
-							tooltip={false}
-							step={5}
-							max={100}
-							ticks={[5, 10, 15, 20, 100]}
-							suffix="%"
-						/>
-
-						<div class="relative ">
-							<input
-								bind:value={leverage}
-								name="amount"
-								type="text"
-								class="px-3 text-base rounded font-pixel outline-none w-14 text-left bg-slate-800  placeholder-shown:border-gray-500"
-							/>
-							<div class="input-x" />
-						</div>
-					</div>
-				</div>
 			</div>
 			<div class="container max-w-lg">
 				{#if $walletStore.connected}
-					<button class="container bg-fuchsia-500 rounded-md">Place Order</button>
+					<button class="container bg-fuchsia-500 rounded-md">Swap</button>
 				{:else}
 					<div class="flex  justify-center">
 						<WalletMultiButton>Connect to place order</WalletMultiButton>
