@@ -116,14 +116,10 @@ pub async fn liquidate_position() {
                 initial_price: utils::scale(1_500, ETH_DECIMALS),
                 initial_conf: utils::scale(10, ETH_DECIMALS),
                 pricing_params: Some(PricingParams {
-                    use_ema: false,
-                    use_unrealized_pnl_in_aum: true,
-                    trade_spread_long: 100,
-                    trade_spread_short: 100,
-                    swap_spread: 300,
-                    min_initial_leverage: 10_000,
+                    // Expressed in BPS, with BPS = 10_000
+                    // 50_000 = x5, 100_000 = x10
                     max_leverage: 100_000,
-                    max_payoff_mult: 10_000,
+                    ..fixtures::pricing_params_regular(false)
                 }),
                 permissions: None,
                 fees: None,
@@ -180,6 +176,8 @@ pub async fn liquidate_position() {
         .unwrap();
     }
 
+    // Price drop makes the position to go over authorized leverage
+
     // Executioner: Liquidate Martin ETH position
     instructions::test_liquidate(
         &mut program_test_ctx,
@@ -191,4 +189,18 @@ pub async fn liquidate_position() {
     )
     .await
     .unwrap();
+
+    // Check user final balance
+    {
+        let martin_eth_pda =
+            utils::find_associated_token_account(&keypairs[USER_MARTIN].pubkey(), &eth_mint).0;
+
+        let martin_eth_balance =
+            utils::get_token_account_balance(&mut program_test_ctx, martin_eth_pda).await;
+
+        assert_eq!(
+            martin_eth_balance,
+            utils::scale_f64(1.372885555, ETH_DECIMALS)
+        );
+    }
 }
