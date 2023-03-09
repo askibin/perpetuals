@@ -15,6 +15,7 @@ Solana Perpetuals protocol is an open-source implementation of a non-custodial d
 
 Rustfmt is used to format the code. It requires `nightly` features to be activated.
 5. Install `nightly` rust toolchain. <https://rust-lang.github.io/rustup/installation/index.html#installing-nightly>
+6. Execute `git config core.hooksPath .githooks` to activate pre-commit hooks
 
 #### [Optionnal] Vscode setup
 
