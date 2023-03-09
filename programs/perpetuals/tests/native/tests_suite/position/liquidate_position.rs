@@ -150,6 +150,18 @@ pub async fn liquidate_position() {
     .unwrap()
     .0;
 
+    // Alice: Try and fail to liquidate Martin ETH position
+    assert!(instructions::test_liquidate(
+        &mut program_test_ctx,
+        &keypairs[USER_ALICE],
+        &keypairs[PAYER],
+        &pool_pda,
+        &eth_mint,
+        &position_pda,
+    )
+    .await
+    .is_err());
+
     // Makes ETH price to drop 10%
     {
         let eth_test_oracle_pda = custodies_infos[0].test_oracle_pda;
