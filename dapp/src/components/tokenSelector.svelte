@@ -77,6 +77,7 @@
 		class="flex gap-2  left-0 right-0 flex-col  z-10 absolute max-h-60 w-120 overflow-scroll top-12 bg-slate-800 rounded-md"
 	>
 		{#each filteredTokens as token, index}
+			<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 			<li
 				tabindex={index}
 				id={`${token.symbol}`}

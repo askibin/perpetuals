@@ -5,10 +5,8 @@
 @layer base {
 	@font-face {
 		font-family: 'Pixel';
-		src: local('pixel'),
-			url('/fonts/VT323/VT323-Regular.ttf');
+		src: local('pixel'), url('/fonts/VT323/VT323-Regular.ttf');
 		font-weight: normal;
 		font-display: swap;
 	}
-	
 }

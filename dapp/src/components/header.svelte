@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { WalletMultiButton, WalletProvider } from '@svelte-on-solana/wallet-adapter-ui';
 	import { onMount } from 'svelte';
-	import { clusterApiUrl } from '@solana/web3.js';
 	const localStorageKey = 'walletAdapter';
 	let wallets;
 
