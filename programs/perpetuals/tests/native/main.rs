@@ -8,9 +8,9 @@ pub async fn test_integration() {
 
     tests_suite::swap::insuffisient_fund().await;
 
-    tests_suite::add_remove_liquidity::fixed_fees().await;
-    tests_suite::add_remove_liquidity::insuffisient_fund().await;
-    tests_suite::add_remove_liquidity::min_max_ratio().await;
+    tests_suite::liquidity::fixed_fees().await;
+    tests_suite::liquidity::insuffisient_fund().await;
+    tests_suite::liquidity::min_max_ratio().await;
 
     tests_suite::position::min_max_leverage().await;
     tests_suite::position::liquidate_position().await;
