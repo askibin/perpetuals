@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 
 	import Header from '../components/header.svelte';
+  import Box from '../components/box.svelte';
 	import { SvelteToast } from '@zerodevx/svelte-toast';
 	import { Metaplex } from '@metaplex-foundation/js';
 	import * as metadata from '@metaplex-foundation/mpl-token-metadata';
@@ -46,16 +47,22 @@
 	};
 </script>
 
-<div class="contaniner flex flex-col gap-20">
-	<Header />
-	<div>
-		<div class="wrapper-app">
-			<div class=" container mx-auto flex flex-col m-6">
-				<slot />
-			</div>
-		</div>
-	</div>
-	<SvelteToast options={toastOptions} />
+<div class="wrapper-app">
+  <Header />
+  <div style="float:right;" id="position-info">
+    <Box>
+      <h2>Open positions</h2>
+      <p>
+        <span class="text-2xl" id="position-size">0</span> positions
+        <br />
+        <span class="text-2xl" id="position-profit">0</span> unrealized profit
+      </p>
+    </Box>
+  </div>
+  <div class="container mx-auto flex flex-col m-6">
+    <slot />
+  </div>
+  <SvelteToast options={toastOptions} />
 </div>
 
 <style style="postcss">
@@ -161,4 +168,18 @@
 		font-size: 20px;
 		margin-bottom: 40px;
 	}
+
+  #position-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin-top: 20px;
+    margin-right: 60px;
+    font-size: 20px;
+    padding: 10px;
+    background-color: black;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
 </style>

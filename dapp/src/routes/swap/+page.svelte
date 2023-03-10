@@ -82,7 +82,7 @@
 				<div class="container max-w-lg">
 					<div class="container flex flex-col j">
 						<div class="container flex flex-row justify-between ">
-							<p class="text-base">You pay</p>
+							<p class="text-base">From</p>
 							{#if $walletStore.connected && selectedBaseToken?.symbol}
 								<div class="flex flex-row items-center gap-1">
 									<p class="text-base">{defaultTokenBalance}</p>
@@ -102,7 +102,7 @@
 				<div class="container max-w-lg">
 					<div class="container flex flex-col j">
 						<div class="container flex flex-row justify-between ">
-							<p class="text-base">You receive</p>
+							<p class="text-base">To</p>
 						</div>
 
 						<TokenInput

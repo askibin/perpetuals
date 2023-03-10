@@ -103,7 +103,7 @@
 				<div class="container max-w-lg">
 					<div class="container flex flex-col j">
 						<div class="container flex flex-row justify-between ">
-							<p class="text-base">You long position</p>
+							<p class="text-base">Your long position</p>
 						</div>
 
 						<TokenInput

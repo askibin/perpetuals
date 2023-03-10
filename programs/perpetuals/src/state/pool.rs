@@ -15,6 +15,8 @@ use {
 
 /// PoolToken holds information about the specific
 /// token in the pool
+/// PoolToken holds information about the specific
+/// token in the pool
 #[derive(Copy, Clone, PartialEq, AnchorSerialize, AnchorDeserialize, Default, Debug)]
 pub struct PoolToken {
     pub custody: Pubkey,
@@ -424,7 +426,6 @@ impl Pool {
         )?)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn check_leverage(
         &self,
         token_id: usize,

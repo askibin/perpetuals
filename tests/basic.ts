@@ -222,22 +222,18 @@ describe('perpetuals', () => {
       },
       fees: {
         mode: { linear: {} },
-        maxIncrease: '20000',
-        maxDecrease: '5000',
-        swap: '100',
-        addLiquidity: '100',
-        removeLiquidity: '100',
-        openPosition: '100',
-        closePosition: '100',
-        liquidation: '100',
-        protocolShare: '10',
+        maxIncrease: "20000",
+        maxDecrease: "5000",
+        swap: "100",
+        addLiquidity: "100",
+        removeLiquidity: "100",
+        openPosition: "100",
+        closePosition: "100",
+        liquidation: "100",
+        protocolShare: "10",
       },
-      borrowRate: {
-        baseRate: '0',
-        slope1: '80000',
-        slope2: '120000',
-        optimalUtilization: '800000000',
-      },
+      borrowRate: "0",
+      borrowRateSum: "0",
       assets: {
         collateral: '0',
         protocolFees: '0',
@@ -261,15 +257,10 @@ describe('perpetuals', () => {
         liquidationUsd: '0',
       },
       tradeStats: {
-        profitUsd: '0',
-        lossUsd: '0',
-        oiLongUsd: '0',
-        oiShortUsd: '0',
-      },
-      borrowRateState: {
-        currentRate: '0',
-        cumulativeInterest: '0',
-        lastUpdate: '0',
+        profitUsd: "0",
+        lossUsd: "0",
+        oiLongUsd: "0",
+        oiShortUsd: "0",
       },
       bump: token.bump,
       tokenAccountBump: token.tokenAccountBump,
@@ -327,7 +318,16 @@ describe('perpetuals', () => {
     expect(JSON.stringify(token)).to.equal(JSON.stringify(tokenExpected));
   });
 
-  it('setTestOraclePrice', async () => {
+  it("setBorrowRate", async () => {
+    await tc.setBorrowRate(tc.custodies[0], new BN(200), new BN(5000000));
+
+    let token = await tc.program.account.custody.fetch(tc.custodies[0].custody);
+    tokenExpected.borrowRate = "200";
+    tokenExpected.borrowRateSum = "5000000";
+    expect(JSON.stringify(token)).to.equal(JSON.stringify(tokenExpected));
+  });
+
+  it("setTestOraclePrice", async () => {
     await tc.setTestOraclePrice(123, tc.custodies[0]);
     await tc.setTestOraclePrice(200, tc.custodies[1]);
 
@@ -418,14 +418,14 @@ describe('perpetuals', () => {
       openTime: '111',
       updateTime: '0',
       side: { long: {} },
-      price: '124230000',
-      sizeUsd: '861000000',
-      collateralUsd: '123000000',
-      unrealizedProfitUsd: '0',
-      unrealizedLossUsd: '0',
-      cumulativeInterestSnapshot: '0',
-      lockedAmount: '7000000000',
-      collateralAmount: '1000000000',
+      price: "124230000",
+      sizeUsd: "861000000",
+      collateralUsd: "123000000",
+      unrealizedProfitUsd: "0",
+      unrealizedLossUsd: "0",
+      borrowRateSum: "5000000",
+      lockedAmount: "7000000000",
+      collateralAmount: "1000000000",
       bump: position.bump,
     };
 
