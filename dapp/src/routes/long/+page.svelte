@@ -11,6 +11,7 @@
 	import { prettyAmount } from '../../helpers';
 	import { actions } from '../../types';
 	import Quote from '../../components/quote.svelte';
+	import LiquidityTooltip from '../../components/liquidityTooltip.svelte';
 
 	// Input
 	let leverage = 15;
@@ -69,15 +70,7 @@
 						</div>
 					{/each}
 				</div>
-				<div class="w-12 flex justify-center">
-					<img
-						alt="liquidity options"
-						class="cursor-pointer"
-						height="10px"
-						width="auto"
-						src="drop.png"
-					/>
-				</div>
+				<LiquidityTooltip />
 			</div>
 			<div class="container flex flex-col gap-5">
 				<div class="container max-w-lg">

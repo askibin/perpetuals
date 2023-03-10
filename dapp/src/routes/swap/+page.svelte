@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { Slider } from 'fluent-svelte';
 	import { walletStore } from '@svelte-on-solana/wallet-adapter-core';
 	import { WalletMultiButton } from '@svelte-on-solana/wallet-adapter-ui';
 	import autoAnimate from '@formkit/auto-animate';
 
 	import { BigNumber as BN } from 'bignumber.js';
 	import TokenInput from '../../components/tokenInput.svelte';
-	import type { Token } from '../../helpers/globalStore';
 	import { page } from '$app/stores';
 	import { prettyAmount } from '../../helpers';
 	import { actions } from '../../types';
+	import LiquidityTooltip from '../../components/liquidityTooltip.svelte';
+	import type { Token } from '../../helpers/globalStore';
 
 	// Input
 	let leverage = 15;
@@ -68,15 +68,7 @@
 						</div>
 					{/each}
 				</div>
-				<div class="w-12 flex justify-center">
-					<img
-						alt="liquidity options"
-						class="cursor-pointer"
-						height="10px"
-						width="auto"
-						src="drop.png"
-					/>
-				</div>
+				<LiquidityTooltip />
 			</div>
 			<div class="container flex flex-col gap-5">
 				<div class="container max-w-lg">
@@ -178,5 +170,10 @@
 		right: 2px;
 		top: 0;
 		color: #94a3b8;
+	}
+
+	.select-list > div {
+		background-color: #1f2937 !important;
+		color: #94a3b8 !important;
 	}
 </style>

@@ -5,6 +5,7 @@ import { getWalletBalances, type HeliusGetWalletBalanceResponse, type SolScanTok
 import BigNumber from 'bignumber.js';
 
 import Moralis from 'moralis';
+import type { SelectorItem } from './types';
 
 const errorToastOptions = {
 	classes: ['bg-red-900', 'font-pixel', 'drop-shadow', 'shadow-red-600'],
@@ -24,6 +25,13 @@ export type Tokens = SolScanTokenMeta[];
 export type TokenMap = Record<string, Token>;
 
 export const tokensStore = writable<Tokens>([]);
+
+export interface Pool extends SelectorItem {
+	id: string;
+	tvl: string;
+	apr: string;
+}
+export const defaultPool = writable<Pool>(null);
 
 export const hydrateTokensStore = (
 	tokens: Tokens,

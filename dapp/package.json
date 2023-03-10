@@ -17,6 +17,7 @@
 		"@esbuild-plugins/node-globals-polyfill": "^0.2.3",
 		"@originjs/vite-plugin-commonjs": "^1.0.3",
 		"@rollup/plugin-inject": "^4.0.4",
+		"@smui/select": "^7.0.0-beta.0",
 		"@sveltejs/adapter-static": "^1.0.0-next.7",
 		"@sveltejs/kit": "1.7.2",
 		"@typescript-eslint/eslint-plugin": "^4.31.1",
@@ -32,6 +33,7 @@
 		"prettier-plugin-svelte": "^2.4.0",
 		"rollup-plugin-node-polyfills": "^0.2.1",
 		"sass": "^1.58.3",
+		"smui-theme": "^7.0.0-beta.0",
 		"svelte": "^3.44.1",
 		"svelte-check": "^2.2.6",
 		"svelte-preprocess": "^4.9.4",
@@ -48,7 +50,6 @@
 		"@moralisweb3/common-sol-utils": "^2.14.3",
 		"@openbook-dex/openbook": "^0.0.4",
 		"@project-serum/anchor": "^0.24.2",
-		"@smui/select": "^7.0.0-beta.0",
 		"@solana/wallet-adapter-base": "0.9.16",
 		"@solana/wallet-adapter-wallets": "0.18.4",
 		"@solana/web3.js": "^1.53.0",
@@ -59,6 +60,7 @@
 		"bignumber.js": "^9.1.1",
 		"buffer": "^6.0.3",
 		"eventemitter3": "^4.0.7",
-		"moralis": "^2.14.3"
+		"moralis": "^2.14.3",
+		"svelte-select": "^5.5.2"
 	}
 }
