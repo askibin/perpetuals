@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { prettyAmount } from '../helpers';
 	import { tokensStore, type Token, type Tokens } from '../helpers/globalStore';
 
 	let searchRef: HTMLInputElement = null;
@@ -86,7 +87,9 @@
 				}`}
 			>
 				<div class="flex flex-row ml-5 gap-5 items-center">
-					<img class="w-8" src={token.icon} alt="token logo" />
+					{#if token.icon !== ''}
+						<img class="w-8" src={token.icon} alt="token logo" />
+					{/if}
 					<button
 						on:click={() => {
 							selectedToken = token;
@@ -101,8 +104,10 @@
 				</div>
 				{#if token.amount}
 					<div class="flex flex-col mr-5">
-						<div class="text-xs text-slate-100">{token.amount}</div>
-						<div class="text-xs text-slate-100">{`$ ${token.amount}`}</div>
+						<div class="text-xs text-slate-100">{prettyAmount(token.amount.toString())}</div>
+						{#if token?.amountUsd}
+							<div class="text-xs text-slate-100">{`$ ${token?.amountUsd}`}</div>
+						{/if}
 					</div>
 				{/if}
 			</li>

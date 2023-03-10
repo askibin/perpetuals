@@ -6,15 +6,15 @@
 
 	// imported vars
 	export let name: string;
-	export let tokenAmount: string | undefined;
+	export let tokenAmount: BN | undefined;
 	export let selectedToken: Token;
-	export let leverage: number;
 	export let allowSelectToken: boolean = true;
 	// Allow only specific tokens to be selected
 	export let allowedTokens: string[] | undefined = undefined;
 
 	// local vars
 	let showTokenDropdown = false;
+	let tokenAmountPretty: string | undefined = undefined;
 	let tokenSearchTerm = '';
 	let filteredTokens = [];
 
@@ -30,11 +30,11 @@
 				tokenAmount = undefined;
 				return;
 			}
-			tokenAmount = prettyAmount(inputValue);
+			tokenAmount = new BN(inputValue.replaceAll(',', ''));
+			console.log('tokenAmount', tokenAmount.toString(), inputValue);
+			tokenAmountPretty = prettyAmount(inputValue);
 		}, 500);
 	};
-
-	//$: tokenAmount = prettyAmount(tokenAmount);
 
 	tokensStore.subscribe((tokens) => {
 		if (tokens.length > 0) {
@@ -69,12 +69,14 @@
 		}}
 		class={`flex items-center gap-2 ${showTokenDropdown ? 'hidden' : ''}`}
 	>
-		<img class="w-5" src={selectedToken?.icon} alt="selected token icon" />
+		{#if selectedToken?.icon !== ''}
+			<img class="w-5" src={selectedToken?.icon} alt="selected token icon" />
+		{/if}
 		<p>{selectedToken?.symbol}</p>
 	</button>
 	<div class="flex flex-col">
 		<input
-			bind:value={tokenAmount}
+			bind:value={tokenAmountPretty}
 			on:input={handleAmountChange}
 			placeholder="0.0"
 			name={`token-${name}`}

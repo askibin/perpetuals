@@ -4,7 +4,7 @@
 	import { WalletMultiButton } from '@svelte-on-solana/wallet-adapter-ui';
 	import autoAnimate from '@formkit/auto-animate';
 
-	import { BigNumber as BN } from 'bignumber.js';
+	import { BigNumber, type BigNumber as BN } from 'bignumber.js';
 	import TokenInput from '../../components/tokenInput.svelte';
 	import type { Token } from '../../helpers/globalStore';
 	import { page } from '$app/stores';
@@ -14,7 +14,6 @@
 
 	// Input
 	let leverage = 15;
-	let defaultTokenBalance = BN(0);
 
 	// tokens
 	let selectedBaseToken: Token | undefined;
@@ -24,28 +23,27 @@
 	let availableLiquidityUSD = '200000';
 
 	// Amounts
-	let baseTokenAmount: string | undefined;
-	let leveragedTokenAmount: string | undefined;
+	let baseTokenAmount: BN | undefined;
+	let leveragedTokenAmount: BN | undefined;
 
 	let showQuote = false;
 
-	function calculateLeveragedTokenAmount(prettyAmount: string | undefined, leverage: number) {
-		if (!prettyAmount) return undefined;
-		const amount = prettyAmount.replaceAll(',', '');
-		if (amount === '') {
-			return '0';
-		}
-		const amountBN = new BN(amount);
-		const amountUSD = amountBN.times(selectedBaseToken?.priceUSD ?? '0');
-		const leverageBN = new BN(leverage);
+	function calculateLeveragedTokenAmount(tokenAmount: BN | undefined, leverage: number): BN {
+		if (!tokenAmount) return undefined;
+		console.log('tokenAmount: ', typeof tokenAmount);
+
+		const amountUSD = new BigNumber(tokenAmount).times(
+			new BigNumber(selectedBaseToken?.priceUSD ?? '0')
+		);
+		const leverageBN = new BigNumber(leverage);
 		const leverageUSD = amountUSD.times(leverageBN);
 		const leverageAmount = leverageUSD.dividedBy(selectedLeverageToken?.priceUSD ?? '0');
-		return leverageAmount.isNaN() ? '0' : leverageAmount.toString();
+		return leverageAmount;
 	}
 	// Update leverage token amount on baseTokenAmount change
 	$: leveragedTokenAmount = calculateLeveragedTokenAmount(baseTokenAmount, leverage);
 
-	$: showQuote = new BN(baseTokenAmount?.replaceAll(',', '')).gt(0) ? true : false;
+	$: showQuote = baseTokenAmount && new BigNumber(baseTokenAmount).gt(0);
 </script>
 
 <div class="container flex flex-col gap-5">
@@ -86,8 +84,8 @@
 							<p class="text-base">Select base token</p>
 							{#if $walletStore.connected && selectedBaseToken?.symbol}
 								<div class="flex flex-row items-center gap-1">
-									<p class="text-base">{defaultTokenBalance}</p>
-									<p class="text-sm">{`${selectedBaseToken?.symbol} balance`}</p>
+									<p class="text-base">{prettyAmount(selectedBaseToken.amount.toString())}</p>
+									<p class="text-sm">{`${selectedBaseToken?.symbol}`}</p>
 								</div>
 							{/if}
 						</div>
@@ -95,9 +93,15 @@
 							name={'base'}
 							bind:tokenAmount={baseTokenAmount}
 							bind:selectedToken={selectedBaseToken}
-							leverage={0}
 						/>
 					</div>
+					{#if baseTokenAmount && new BigNumber(baseTokenAmount).gt(new BigNumber(selectedBaseToken?.amount ?? '0'))}
+						<div class="">
+							<p class="font-pixel text-sm text-red-500" />
+							<p>Not enough funds.</p>
+							<a href="/swap">swap here</a>
+						</div>
+					{/if}
 				</div>
 
 				<div class="container max-w-lg">
@@ -110,7 +114,6 @@
 							name="leverage"
 							bind:tokenAmount={leveragedTokenAmount}
 							bind:selectedToken={selectedLeverageToken}
-							bind:leverage
 						/>
 					</div>
 				</div>

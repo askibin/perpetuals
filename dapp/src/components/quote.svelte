@@ -1,6 +1,7 @@
 <script lang="ts">
+	import type { BigNumber as BN } from 'bignumber.js';
 	import { prettyAmount } from '../helpers';
-	export let baseTokenAmount: string | undefined;
+	export let baseTokenAmount: BN | undefined;
 	export let borrowFeePerHr: number;
 	export let availableLiquidityUSD: string;
 </script>
@@ -12,11 +13,11 @@
 	<div class="flex flex-col gap-1">
 		<div class="flex flex-row justify-between">
 			<p class="text-base font-pixel">Entry price</p>
-			<p class="text-base font-pixel">{`$${prettyAmount(baseTokenAmount)}`}</p>
+			<p class="text-base font-pixel">{`$${prettyAmount(baseTokenAmount.toString())}`}</p>
 		</div>
 		<div class="flex flex-row justify-between">
 			<p class="text-base font-pixel">Exit price</p>
-			<p class="text-base font-pixel">{`$${prettyAmount(baseTokenAmount)}`}</p>
+			<p class="text-base font-pixel">{`$${prettyAmount(baseTokenAmount.toString())}`}</p>
 		</div>
 		<div class="flex flex-row justify-between">
 			<p class="text-base font-pixel">Borrow fee</p>
