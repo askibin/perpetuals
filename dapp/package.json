@@ -18,6 +18,7 @@
 		"@originjs/vite-plugin-commonjs": "^1.0.3",
 		"@rollup/plugin-inject": "^4.0.4",
 		"@sveltejs/adapter-static": "^1.0.0-next.7",
+		"@sveltejs/adapter-vercel": "^2.3.1",
 		"@sveltejs/kit": "1.7.2",
 		"@typescript-eslint/eslint-plugin": "^4.31.1",
 		"@typescript-eslint/parser": "^4.31.1",
