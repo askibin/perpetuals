@@ -1,5 +1,7 @@
 //! AddPool instruction handler
 
+use anchor_spl::token::TokenAccount;
+
 use {
     crate::state::{
         multisig::{AdminInstruction, Multisig},
@@ -54,6 +56,31 @@ pub struct AddPool<'info> {
         bump
     )]
     pub pool: Box<Account<'info, Pool>>,
+
+    // lp_token_staking vault
+    #[account(
+        init_if_needed,
+        payer = admin,
+        token::mint = lp_token_mint,
+        token::authority = transfer_authority,
+        seeds = [b"stake_token_account"],
+        bump
+    )]
+    pub stake_token_account: Box<Account<'info, TokenAccount>>,
+
+    // lp_token_staking r-token
+    #[account(
+        init_if_needed,
+        payer = admin,
+        mint::authority = transfer_authority,
+        mint::freeze_authority = transfer_authority,
+        mint::decimals = Pool::REDEEMABLE_DECIMALS,
+        seeds = [b"stake_redeemable_token_mint",
+                 pool.key().as_ref(),
+                 lp_token_mint.key().as_ref()],
+        bump
+    )]
+    pub stake_redeemable_token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init_if_needed,

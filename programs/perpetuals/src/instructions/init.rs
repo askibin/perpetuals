@@ -1,5 +1,7 @@
 //! Init instruction handler
 
+use anchor_spl::token::TokenAccount;
+
 use {
     crate::{
         error::PerpetualsError,
@@ -53,6 +55,30 @@ pub struct Init<'info> {
         bump
     )]
     pub lm_token_mint: Box<Account<'info, Mint>>,
+
+    // lm_token_staking vault
+    #[account(
+        init,
+        payer = upgrade_authority,
+        token::mint = lm_token_mint,
+        token::authority = transfer_authority,
+        seeds = [b"stake_token_account"],
+        bump
+    )]
+    pub stake_token_account: Box<Account<'info, TokenAccount>>,
+
+    // lm_token_staking r-token
+    #[account(
+        init,
+        payer = upgrade_authority,
+        mint::authority = transfer_authority,
+        mint::freeze_authority = transfer_authority,
+        mint::decimals = Cortex::REDEEMABLE_DECIMALS,
+        seeds = [b"redeemable_token_mint",
+                 lm_token_mint.key().as_ref()],
+        bump
+    )]
+    pub redeemable_token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init,
@@ -134,6 +160,14 @@ pub fn init(ctx: Context<Init>, params: &InitParams) -> Result<()> {
         .get("lm_token_mint")
         .ok_or(ProgramError::InvalidSeeds)?;
     cortex.bump = *ctx.bumps.get("cortex").ok_or(ProgramError::InvalidSeeds)?;
+    cortex.redeemable_token_bump = *ctx
+        .bumps
+        .get("redeemable_token_mint")
+        .ok_or(ProgramError::InvalidSeeds)?;
+    cortex.stake_token_account_bump = *ctx
+        .bumps
+        .get("stake_token_account")
+        .ok_or(ProgramError::InvalidSeeds)?;
     cortex.inception_epoch = cortex.get_epoch()?;
 
     Ok(())

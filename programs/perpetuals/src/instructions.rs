@@ -31,6 +31,7 @@ pub mod open_position;
 pub mod remove_collateral;
 pub mod remove_liquidity;
 pub mod swap;
+mod add_stake_cortex;
 
 // bring everything in scope
 pub use add_custody::*;

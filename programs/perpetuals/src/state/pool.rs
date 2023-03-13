@@ -32,6 +32,8 @@ pub struct Pool {
 
     pub bump: u8,
     pub lp_token_bump: u8,
+    pub stake_redeemable_token_mint: u8,
+    pub stake_token_account_bump: u8,
     pub inception_time: i64,
 }
 
@@ -41,6 +43,7 @@ pub struct Pool {
 ///
 impl Pool {
     pub const LEN: usize = 8 + std::mem::size_of::<Pool>();
+    pub const REDEEMABLE_DECIMALS: u8 = Perpetuals::USD_DECIMALS; // LP token staking redeemable
 
     pub fn get_token_id(&self, custody: &Pubkey) -> Result<usize> {
         self.tokens

@@ -12,9 +12,10 @@ const ADRENA_EPOCH: u8 = 10;
 #[account]
 #[derive(Default, Debug)]
 pub struct Cortex {
-    // emission have implied RATE_DECIMALS decimals
     pub bump: u8,
     pub lm_token_bump: u8,
+    pub redeemable_token_bump: u8,
+    pub stake_token_account_bump: u8,
     pub inception_epoch: u64,
 }
 
@@ -23,6 +24,7 @@ impl Cortex {
     pub const LEN: usize = 8 + std::mem::size_of::<Cortex>();
     const INCEPTION_EMISSION_RATE: u64 = Perpetuals::RATE_POWER as u64; // 100%
     pub const FEE_TO_REWARD_RATIO_BPS: u8 = 10; //  0.10% of fees paid become rewards
+    pub const REDEEMABLE_DECIMALS: u8 = Perpetuals::USD_DECIMALS; // LM token staking redeemable
 
     pub fn get_swap_lm_rewards_amounts(&self, (fee_in, fee_out): (u64, u64)) -> Result<(u64, u64)> {
         Ok((
