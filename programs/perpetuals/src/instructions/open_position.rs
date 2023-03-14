@@ -106,7 +106,9 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     let perpetuals = ctx.accounts.perpetuals.as_mut();
     let custody = ctx.accounts.custody.as_mut();
     require!(
-        perpetuals.permissions.allow_open_position && custody.permissions.allow_open_position,
+        perpetuals.permissions.allow_open_position
+            && custody.permissions.allow_open_position
+            && !custody.is_stable,
         PerpetualsError::InstructionNotAllowed
     );
 
@@ -204,6 +206,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         math::checked_mul(params.size as u128, custody.pricing.max_payoff_mult as u128)?,
         Perpetuals::BPS_POWER,
     )?)?;
+
     position.collateral_amount = params.collateral;
     position.bump = *ctx
         .bumps
@@ -217,15 +220,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         PerpetualsError::InsufficientAmountReturned
     );
     require!(
-        pool.check_leverage(
-            token_id,
-            position,
-            &token_price,
-            &token_ema_price,
-            custody,
-            curtime,
-            true
-        )?,
+        pool.check_leverage(token_id, position, &token_ema_price, custody, curtime, true)?,
         PerpetualsError::MaxLeverage
     );
 
@@ -265,7 +260,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
             math::checked_add(custody.trade_stats.oi_short_usd, size_usd)?;
     }
 
-    custody.add_position(position, curtime)?;
+    custody.add_position(position, &token_price, curtime)?;
     custody.update_borrow_rate(curtime)?;
 
     Ok(())

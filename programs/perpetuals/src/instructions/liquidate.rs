@@ -138,7 +138,6 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
         !pool.check_leverage(
             token_id,
             position,
-            &token_price,
             &token_ema_price,
             custody,
             curtime,
@@ -176,7 +175,7 @@ pub fn liquidate(ctx: Context<Liquidate>, _params: &LiquidateParams) -> Result<(
     msg!("Check pool constraints");
     require!(
         pool.check_available_amount(total_amount_out, custody)?,
-        PerpetualsError::PoolAmountLimit
+        PerpetualsError::CustodyAmountLimit
     );
 
     // transfer tokens

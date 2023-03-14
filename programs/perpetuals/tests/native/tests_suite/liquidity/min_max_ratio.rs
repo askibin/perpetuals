@@ -23,8 +23,7 @@ const KEYPAIRS_COUNT: usize = 7;
 const USDC_DECIMALS: u8 = 6;
 const ETH_DECIMALS: u8 = 9;
 
-#[tokio::test]
-pub async fn insuffisient_fund() {
+pub async fn min_max_ratio() {
     let mut program_test = ProgramTest::default();
 
     // Initialize the accounts that will be used during the test suite
@@ -100,8 +99,8 @@ pub async fn insuffisient_fund() {
                     decimals: USDC_DECIMALS,
                     is_stable: true,
                     target_ratio: utils::ratio_from_percentage(50.0),
-                    min_ratio: utils::ratio_from_percentage(0.0),
-                    max_ratio: utils::ratio_from_percentage(100.0),
+                    min_ratio: utils::ratio_from_percentage(30.0),
+                    max_ratio: utils::ratio_from_percentage(60.0),
                     initial_price: utils::scale(1, USDC_DECIMALS),
                     initial_conf: utils::scale_f64(0.01, USDC_DECIMALS),
                     pricing_params: None,
@@ -109,7 +108,7 @@ pub async fn insuffisient_fund() {
                     fees: None,
                     borrow_rate: None,
                 },
-                liquidity_amount: utils::scale(0, USDC_DECIMALS),
+                liquidity_amount: utils::scale(1_500, USDC_DECIMALS),
                 payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
             utils::SetupCustodyWithLiquidityParams {
@@ -118,8 +117,8 @@ pub async fn insuffisient_fund() {
                     decimals: ETH_DECIMALS,
                     is_stable: false,
                     target_ratio: utils::ratio_from_percentage(50.0),
-                    min_ratio: utils::ratio_from_percentage(0.0),
-                    max_ratio: utils::ratio_from_percentage(100.0),
+                    min_ratio: utils::ratio_from_percentage(30.0),
+                    max_ratio: utils::ratio_from_percentage(60.0),
                     initial_price: utils::scale(1_500, ETH_DECIMALS),
                     initial_conf: utils::scale(10, ETH_DECIMALS),
                     pricing_params: None,
@@ -127,14 +126,14 @@ pub async fn insuffisient_fund() {
                     fees: None,
                     borrow_rate: None,
                 },
-                liquidity_amount: utils::scale(0, ETH_DECIMALS),
+                liquidity_amount: utils::scale(1, ETH_DECIMALS),
                 payer: utils::copy_keypair(&keypairs[USER_ALICE]),
             },
         ],
     )
     .await;
 
-    // Trying to add more USDC than owned should fail
+    // Go over 60% ratio should trigger error
     assert!(instructions::test_add_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
@@ -142,40 +141,11 @@ pub async fn insuffisient_fund() {
         &pool_pda,
         &usdc_mint,
         AddLiquidityParams {
-            amount: utils::scale(1_000_000, USDC_DECIMALS),
+            amount: utils::scale(1_000, USDC_DECIMALS),
         },
     )
     .await
     .is_err());
-
-    // Alice: add 15k USDC and 10 ETH liquidity
-    {
-        instructions::test_add_liquidity(
-            &mut program_test_ctx,
-            &keypairs[USER_ALICE],
-            &keypairs[PAYER],
-            &pool_pda,
-            &usdc_mint,
-            AddLiquidityParams {
-                amount: utils::scale(15_000, USDC_DECIMALS),
-            },
-        )
-        .await
-        .unwrap();
-
-        instructions::test_add_liquidity(
-            &mut program_test_ctx,
-            &keypairs[USER_ALICE],
-            &keypairs[PAYER],
-            &pool_pda,
-            &eth_mint,
-            AddLiquidityParams {
-                amount: utils::scale(10, ETH_DECIMALS),
-            },
-        )
-        .await
-        .unwrap();
-    }
 
     let alice_lp_token_mint_pda =
         utils::find_associated_token_account(&keypairs[USER_ALICE].pubkey(), &lp_token_mint_pda).0;
@@ -183,7 +153,8 @@ pub async fn insuffisient_fund() {
     let alice_lp_token_account_balance =
         utils::get_token_account_balance(&mut program_test_ctx, alice_lp_token_mint_pda).await;
 
-    // Trying to remove more LP token than owned should fail
+    // Try to remove 35% of LP token as USDC (~1,050 USDC), lowering USDC ratio to ~23%
+    // Going under 30% ratio should trigger error
     assert!(instructions::test_remove_liquidity(
         &mut program_test_ctx,
         &keypairs[USER_ALICE],
@@ -191,21 +162,7 @@ pub async fn insuffisient_fund() {
         &pool_pda,
         &usdc_mint,
         RemoveLiquidityParams {
-            lp_amount: alice_lp_token_account_balance + 1,
-        },
-    )
-    .await
-    .is_err());
-
-    // Trying to remove more asset than owned by the pool should fail
-    assert!(instructions::test_remove_liquidity(
-        &mut program_test_ctx,
-        &keypairs[USER_ALICE],
-        &keypairs[PAYER],
-        &pool_pda,
-        &usdc_mint,
-        RemoveLiquidityParams {
-            lp_amount: alice_lp_token_account_balance * 75 / 100,
+            lp_amount: alice_lp_token_account_balance * 35 / 100,
         },
     )
     .await

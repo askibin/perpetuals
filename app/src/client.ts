@@ -146,6 +146,29 @@ export class PerpetualsClient {
     );
   };
 
+  getCustodyMetas = async (poolName: string) => {
+    let pool = await this.getPool(poolName);
+    let custodies = await this.program.account.custody.fetchMultiple(
+      pool.tokens.map((t) => t.custody)
+    );
+    let custodyMetas = [];
+    for (const token of pool.tokens) {
+      custodyMetas.push({
+        isSigner: false,
+        isWritable: false,
+        pubkey: token.custody,
+      });
+    }
+    for (const custody of custodies) {
+      custodyMetas.push({
+        isSigner: false,
+        isWritable: false,
+        pubkey: custody.oracle.oracleAccount,
+      });
+    }
+    return custodyMetas;
+  };
+
   getMultisig = async () => {
     return this.program.account.multisig.fetch(this.multisig.publicKey);
   };
@@ -187,7 +210,7 @@ export class PerpetualsClient {
     let positions = await this.provider.connection.getProgramAccounts(
       this.program.programId,
       {
-        filters: [{ dataSize: 152 }, { memcmp: { bytes: data, offset: 0 } }],
+        filters: [{ dataSize: 200 }, { memcmp: { bytes: data, offset: 0 } }],
       }
     );
     return Promise.all(
@@ -199,11 +222,14 @@ export class PerpetualsClient {
 
   getPoolTokenPositions = async (poolName: string, tokenMint: PublicKey) => {
     let poolKey = this.getPoolKey(poolName);
-    let data = encode(Buffer.concat([poolKey.toBuffer(), Buffer.from([0])]));
+    let custodyKey = this.getCustodyKey(poolName, tokenMint);
+    let data = encode(
+      Buffer.concat([poolKey.toBuffer(), custodyKey.toBuffer()])
+    );
     let positions = await this.provider.connection.getProgramAccounts(
       this.program.programId,
       {
-        filters: [{ dataSize: 152 }, { memcmp: { bytes: data, offset: 40 } }],
+        filters: [{ dataSize: 200 }, { memcmp: { bytes: data, offset: 40 } }],
       }
     );
     return Promise.all(
@@ -476,7 +502,6 @@ export class PerpetualsClient {
         ema,
       })
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         custody: this.getCustodyKey(poolName, tokenMint),
@@ -506,7 +531,6 @@ export class PerpetualsClient {
         side: side === "long" ? { long: {} } : { short: {} },
       })
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         custody: this.getCustodyKey(poolName, tokenMint),
@@ -531,7 +555,6 @@ export class PerpetualsClient {
     return await this.program.methods
       .getExitPriceAndFee({})
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         position: this.getPositionKey(wallet, poolName, tokenMint, side),
@@ -557,7 +580,6 @@ export class PerpetualsClient {
     return await this.program.methods
       .getLiquidationPrice({})
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         position: this.getPositionKey(wallet, poolName, tokenMint, side),
@@ -583,7 +605,6 @@ export class PerpetualsClient {
     return await this.program.methods
       .getLiquidationState({})
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         position: this.getPositionKey(wallet, poolName, tokenMint, side),
@@ -609,7 +630,6 @@ export class PerpetualsClient {
     return await this.program.methods
       .getPnl({})
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         position: this.getPositionKey(wallet, poolName, tokenMint, side),
@@ -637,7 +657,6 @@ export class PerpetualsClient {
         amountIn,
       })
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
         receivingCustody: this.getCustodyKey(poolName, tokenMintIn),
@@ -660,12 +679,12 @@ export class PerpetualsClient {
 
   getAum = async (poolName: string) => {
     return await this.program.methods
-      .get_assets_under_management({})
+      .getAssetsUnderManagement({})
       .accounts({
-        signer: this.provider.wallet.publicKey,
         perpetuals: this.perpetuals.publicKey,
         pool: this.getPoolKey(poolName),
       })
+      .remainingAccounts(await this.getCustodyMetas(poolName))
       .view()
       .catch((err) => {
         console.error(err);

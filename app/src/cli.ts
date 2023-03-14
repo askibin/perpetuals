@@ -77,8 +77,12 @@ async function addCustody(
     tradeSpreadShort: new BN(100),
     swapSpread: new BN(200),
     minInitialLeverage: new BN(10000),
+    maxInitialLeverage: new BN(1000000),
     maxLeverage: new BN(1000000),
     maxPayoffMult: new BN(10000),
+    maxUtilization: new BN(10000),
+    maxPositionLockedUsd: new BN(1000000000),
+    maxTotalLockedUsd: new BN(0),
   };
   let permissions = {
     allowSwap: true,
@@ -156,6 +160,10 @@ async function getUserPosition(
 
 async function getUserPositions(wallet: PublicKey) {
   client.prettyPrint(await client.getUserPositions(wallet));
+}
+
+async function getPoolTokenPositions(poolName: string, tokenMint: PublicKey) {
+  client.prettyPrint(await client.getPoolTokenPositions(poolName, tokenMint));
 }
 
 async function getAllPositions() {
@@ -277,7 +285,7 @@ async function getAum(poolName: string) {
     .command("init")
     .description("Initialize the on-chain program")
     .requiredOption("-m, --min-signatures <int>", "Minimum signatures")
-    .argument("<paths...>", "Filepaths to admin keypairs")
+    .argument("<pubkey...>", "Admin public keys")
     .action(async (args, options) => {
       await init(
         args.map((x) => new PublicKey(x)),
@@ -289,7 +297,7 @@ async function getAum(poolName: string) {
     .command("set-authority")
     .description("Set protocol admins")
     .requiredOption("-m, --min-signatures <int>", "Minimum signatures")
-    .argument("<paths...>", "Filepaths to admin keypairs")
+    .argument("<pubkey...>", "Admin public keys")
     .action(async (args, options) => {
       await setAuthority(
         args.map((x) => new PublicKey(x)),
@@ -415,6 +423,15 @@ async function getAum(poolName: string) {
     .argument("<pubkey>", "User wallet")
     .action(async (wallet) => {
       await getUserPositions(new PublicKey(wallet));
+    });
+
+  program
+    .command("get-pool-token-positions")
+    .description("Print positions in the token")
+    .argument("<string>", "Pool name")
+    .argument("<pubkey>", "Token mint")
+    .action(async (poolName, tokenMint) => {
+      await getPoolTokenPositions(poolName, new PublicKey(tokenMint));
     });
 
   program

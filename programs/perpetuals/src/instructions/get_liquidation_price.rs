@@ -10,9 +10,6 @@ use {
 
 #[derive(Accounts)]
 pub struct GetLiquidationPrice<'info> {
-    #[account()]
-    pub signer: Signer<'info>,
-
     #[account(
         seeds = [b"perpetuals"],
         bump = perpetuals.perpetuals_bump
@@ -75,5 +72,6 @@ pub fn get_liquidation_price(
         &ctx.accounts.position,
         &token_price,
         custody,
+        curtime,
     )
 }
