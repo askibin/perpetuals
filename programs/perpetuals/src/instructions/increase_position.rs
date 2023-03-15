@@ -1,4 +1,4 @@
-//! AddCollateral instruction handler
+//! IncreasePosition instruction handler
 
 use {
     crate::{
@@ -17,8 +17,8 @@ use {
 };
 
 #[derive(Accounts)]
-#[instruction(params: AddCollateralParams)]
-pub struct AddCollateral<'info> {
+#[instruction(params: IncreasePositionParams)]
+pub struct IncreasePosition<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -90,13 +90,16 @@ pub struct AddCollateral<'info> {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct AddCollateralParams {
+pub struct IncreasePositionParams {
     pub price: u64,
     pub collateral: u64,
     pub size: u64,
 }
 
-pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams) -> Result<()> {
+pub fn increase_position(
+    ctx: Context<IncreasePosition>,
+    params: &IncreasePositionParams,
+) -> Result<()> {
     // check permissions
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
@@ -270,7 +273,7 @@ pub fn add_collateral(ctx: Context<AddCollateral>, params: &AddCollateralParams)
     }
 
     if params.size > 0 {
-        custody.add_position(position, curtime)?;
+        custody.add_position(position, &token_price, curtime)?;
     } else if params.collateral > 0 {
         custody.add_collateral(position.side, collateral_usd)?;
     }

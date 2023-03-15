@@ -462,8 +462,8 @@ describe("perpetuals", () => {
     expect(JSON.stringify(position)).to.equal(JSON.stringify(positionExpected));
   });
 
-  it("addCollateral", async () => {
-    await tc.addCollateral(
+  it("increasePosition", async () => {
+    await tc.increasePosition(
       125,
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.toTokenAmount(2, tc.custodies[0].decimals),

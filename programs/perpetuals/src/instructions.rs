@@ -17,7 +17,6 @@ pub mod set_test_time;
 pub mod test_init;
 
 // public instructions
-pub mod add_collateral;
 pub mod add_liquidity;
 pub mod close_position;
 pub mod get_assets_under_management;
@@ -28,6 +27,7 @@ pub mod get_liquidation_state;
 pub mod get_oracle_price;
 pub mod get_pnl;
 pub mod get_swap_amount_and_fees;
+pub mod increase_position;
 pub mod liquidate;
 pub mod open_position;
 pub mod remove_collateral;
@@ -51,7 +51,6 @@ pub use set_test_oracle_price::*;
 pub use set_test_time::*;
 pub use test_init::*;
 
-pub use add_collateral::*;
 pub use add_liquidity::*;
 pub use close_position::*;
 pub use get_assets_under_management::*;
@@ -62,6 +61,7 @@ pub use get_liquidation_state::*;
 pub use get_oracle_price::*;
 pub use get_pnl::*;
 pub use get_swap_amount_and_fees::*;
+pub use increase_position::*;
 pub use liquidate::*;
 pub use open_position::*;
 pub use remove_collateral::*;
