@@ -188,7 +188,7 @@ pub fn increase_position(
     msg!("Update existing position");
     let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
     let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
-    msg!("params Collateral added in USD: {}", params.collateral);
+    msg!("Params Collateral added: {}", params.collateral);
     msg!("Collateral added in USD: {}", collateral_usd);
     let additional_locked_amount = math::checked_as_u64(math::checked_div(
         math::checked_mul(params.size as u128, custody.pricing.max_payoff_mult as u128)?,
@@ -207,11 +207,11 @@ pub fn increase_position(
         // will be reopen later
         custody.remove_position(position, curtime)?;
 
-        // (current size * price + new size * new price) /
+        // (current size * price + new size * new price) / (current size + new size)
         position.price = math::checked_as_u64(math::checked_div(
             math::checked_add(
                 math::checked_mul(position.size_usd as u128, position.price as u128)?,
-                math::checked_mul(params.size as u128, position_price as u128)?,
+                math::checked_mul(size_usd as u128, position_price as u128)?,
             )?,
             math::checked_add(position.size_usd as u128, params.size as u128)?,
         )?)?;
