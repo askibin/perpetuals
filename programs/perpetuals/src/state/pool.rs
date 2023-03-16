@@ -118,10 +118,15 @@ impl Pool {
         &self,
         token_id: usize,
         collateral: u64,
+        size: u64,
         custody: &Custody,
         token_price: &OraclePrice,
     ) -> Result<u64> {
-        self.get_remove_liquidity_fee(token_id, collateral, custody, token_price)
+        let collateral_fee =
+            self.get_remove_liquidity_fee(token_id, collateral, custody, token_price)?;
+        let size_fee = Self::get_fee_amount(custody.fees.close_position, size)?;
+
+        math::checked_add(collateral_fee, size_fee)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -393,7 +398,13 @@ impl Pool {
         // liq_price_short = pos_price + (collateral + unreal_profit - (exit_fee + unreal_loss + size / max_leverage)) / init_leverage - spread
         let collateral = token_price.get_token_amount(position.collateral_usd, custody.decimals)?;
 
-        let exit_fee_tokens = self.get_exit_fee(token_id, collateral, custody, token_price)?;
+        let exit_fee_tokens = self.get_exit_fee(
+            token_id,
+            collateral,
+            position.size_usd,
+            custody,
+            token_price,
+        )?;
 
         let exit_fee_usd = token_price.get_asset_amount_usd(exit_fee_tokens, custody.decimals)?;
 
@@ -489,7 +500,13 @@ impl Pool {
         let exit_fee = if liquidation {
             self.get_liquidation_fee(token_id, collateral, custody, token_price)?
         } else {
-            self.get_exit_fee(token_id, collateral, custody, token_price)?
+            self.get_exit_fee(
+                token_id,
+                collateral,
+                position.size_usd,
+                custody,
+                token_price,
+            )?
         };
 
         let exit_fee_usd = token_price.get_asset_amount_usd(exit_fee, custody.decimals)?;

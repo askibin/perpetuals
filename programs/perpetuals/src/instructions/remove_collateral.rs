@@ -5,8 +5,11 @@ use {
         error::PerpetualsError,
         math,
         state::{
-            custody::Custody, oracle::OraclePrice, perpetuals::Perpetuals, pool::Pool,
-            position::Position,
+            custody::Custody,
+            oracle::OraclePrice,
+            perpetuals::Perpetuals,
+            pool::Pool,
+            position::{Position, Side},
         },
     },
     anchor_lang::prelude::*,
@@ -89,7 +92,9 @@ pub struct RemoveCollateral<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct RemoveCollateralParams {
-    collateral_usd: u64,
+    pub price: u64,
+    pub collateral_usd: u64,
+    pub size_usd: u64,
 }
 
 pub fn remove_collateral(
@@ -100,16 +105,32 @@ pub fn remove_collateral(
     msg!("Check permissions");
     let perpetuals = ctx.accounts.perpetuals.as_mut();
     let custody = ctx.accounts.custody.as_mut();
-    require!(
-        perpetuals.permissions.allow_collateral_withdrawal
-            && custody.permissions.allow_collateral_withdrawal,
-        PerpetualsError::InstructionNotAllowed
-    );
+    if params.collateral_usd > 0 {
+        require!(
+            perpetuals.permissions.allow_collateral_withdrawal
+                && custody.permissions.allow_collateral_withdrawal,
+            PerpetualsError::InstructionNotAllowed
+        );
+    }
+    if params.size_usd > 0 {
+        require!(
+            perpetuals.permissions.allow_close_position && custody.permissions.allow_close_position,
+            PerpetualsError::InstructionNotAllowed
+        );
+    }
 
     // validate inputs
     msg!("Validate inputs");
     let position = ctx.accounts.position.as_mut();
-    if params.collateral_usd == 0 || params.collateral_usd >= position.collateral_usd {
+    if params.collateral_usd == 0 && (params.price == 0 || params.size_usd == 0) {
+        return Err(ProgramError::InvalidArgument.into());
+    }
+    if params.collateral_usd > 0
+        && params.collateral_usd >= (position.size_usd - position.collateral_usd)
+    {
+        return Err(ProgramError::InvalidArgument.into());
+    }
+    if params.size_usd >= position.size_usd {
         return Err(ProgramError::InvalidArgument.into());
     }
     let pool = ctx.accounts.pool.as_mut();
@@ -136,9 +157,24 @@ pub fn remove_collateral(
         custody.pricing.use_ema,
     )?;
 
+    let exit_price = pool.get_exit_price(&token_price, &token_ema_price, position.side, custody)?;
+    msg!("Exit price: {}", exit_price);
+
+    if position.side == Side::Long {
+        require_gte!(exit_price, params.price, PerpetualsError::MaxPriceSlippage);
+    } else {
+        require_gte!(params.price, exit_price, PerpetualsError::MaxPriceSlippage);
+    }
+
     // compute fee
     let collateral = token_price.get_token_amount(params.collateral_usd, custody.decimals)?;
-    let fee_amount = pool.get_remove_liquidity_fee(token_id, collateral, custody, &token_price)?;
+    let fee_amount = pool.get_exit_fee(
+        token_id,
+        collateral,
+        position.size_usd,
+        custody,
+        &token_price,
+    )?;
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
@@ -159,7 +195,36 @@ pub fn remove_collateral(
 
     // update existing position
     msg!("Update existing position");
+    let size = token_price.get_token_amount(params.size_usd, custody.decimals)?;
+    let release_locked_amount = math::checked_as_u64(math::checked_div(
+        math::checked_mul(size as u128, custody.pricing.max_payoff_mult as u128)?,
+        Perpetuals::BPS_POWER,
+    )?)?;
+
     position.update_time = curtime;
+
+    if params.size_usd > 0 {
+        // calculate interest fee and reset cumulative_interest_snapshot
+        let interest_usd = custody.get_interest_amount_usd(position, curtime)?;
+        position.unrealized_loss_usd =
+            math::checked_add(position.unrealized_loss_usd, interest_usd)?;
+        position.cumulative_interest_snapshot = custody.get_cumulative_interest(curtime)?;
+        // remove position here cause borrow fees collected
+        // will be reopen later
+        custody.remove_position(position, curtime)?;
+
+        // (current size * price - removed size * new price) / (current size - removed size)
+        position.price = math::checked_as_u64(math::checked_div(
+            math::checked_sub(
+                math::checked_mul(position.size_usd as u128, position.price as u128)?,
+                math::checked_mul(params.size_usd as u128, exit_price as u128)?,
+            )?,
+            math::checked_sub(position.size_usd as u128, params.size_usd as u128)?,
+        )?)?;
+        position.size_usd = math::checked_sub(position.size_usd, params.size_usd)?;
+        position.locked_amount = math::checked_sub(position.locked_amount, release_locked_amount)?;
+    }
+
     position.collateral_usd = math::checked_sub(position.collateral_usd, params.collateral_usd)?;
     position.collateral_amount = math::checked_sub(position.collateral_amount, collateral)?;
 
@@ -177,6 +242,9 @@ pub fn remove_collateral(
         PerpetualsError::MaxLeverage
     );
 
+    // unlock funds
+    custody.unlock_funds(release_locked_amount)?;
+
     // transfer tokens
     msg!("Transfer tokens");
     perpetuals.transfer_tokens(
@@ -189,15 +257,33 @@ pub fn remove_collateral(
 
     // update custody stats
     msg!("Update custody stats");
-    custody.collected_fees.open_position_usd = custody
+    custody.collected_fees.close_position_usd = custody
         .collected_fees
-        .open_position_usd
+        .close_position_usd
         .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+    custody.volume_stats.open_position_usd = custody
+        .volume_stats
+        .open_position_usd
+        .wrapping_sub(params.size_usd);
 
     custody.assets.collateral = math::checked_sub(custody.assets.collateral, collateral)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
-    custody.remove_collateral(position.side, params.collateral_usd)?;
+    if position.side == Side::Long {
+        custody.trade_stats.oi_long_usd =
+            math::checked_sub(custody.trade_stats.oi_long_usd, params.size_usd)?;
+    } else {
+        custody.trade_stats.oi_short_usd =
+            math::checked_sub(custody.trade_stats.oi_short_usd, params.size_usd)?;
+    }
+
+    if params.size_usd > 0 {
+        custody.add_position(position, &token_price, curtime)?;
+    } else if params.collateral_usd > 0 {
+        custody.remove_collateral(position.side, params.collateral_usd)?;
+    }
+
+    custody.update_borrow_rate(curtime)?;
 
     Ok(())
 }

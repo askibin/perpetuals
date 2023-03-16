@@ -89,6 +89,7 @@ pub fn get_exit_price_and_fee(
     let fee = pool.get_exit_fee(
         pool.get_token_id(&custody.key())?,
         collateral,
+        position.size_usd,
         custody,
         &token_price,
     )?;
