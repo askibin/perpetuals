@@ -876,6 +876,7 @@ export class TestClient {
   };
 
   addCollateral = async (
+    price: number,
     collateral: typeof BN,
     user,
     fundingAccount: PublicKey,
@@ -885,6 +886,7 @@ export class TestClient {
     try {
       await this.program.methods
         .addCollateral({
+          price: new BN(price * 1000000),
           collateral,
         })
         .accounts({
@@ -910,6 +912,7 @@ export class TestClient {
   };
 
   removeCollateral = async (
+    price: number,
     collateralUsd: typeof BN,
     user,
     receivingAccount: PublicKey,
@@ -919,6 +922,7 @@ export class TestClient {
     try {
       await this.program.methods
         .removeCollateral({
+          price: new BN(price * 1000000),
           collateralUsd,
         })
         .accounts({

@@ -1389,14 +1389,14 @@ mod test {
         assert_eq!(interest, 0);
 
         let interest = custody.get_interest_amount_usd(&position, 7200).unwrap();
-        assert_eq!(interest, scale_f64(0.14, Perpetuals::USD_DECIMALS));
+        assert_eq!(interest, scale_f64(0.112, Perpetuals::USD_DECIMALS));
 
         custody.update_borrow_rate(7200).unwrap();
         let interest = custody.get_interest_amount_usd(&position, 7199).unwrap();
-        assert_eq!(interest, scale_f64(0.14, Perpetuals::USD_DECIMALS));
+        assert_eq!(interest, scale_f64(0.112, Perpetuals::USD_DECIMALS));
 
         position.cumulative_interest_snapshot = 70000;
         let interest = custody.get_interest_amount_usd(&position, 7200).unwrap();
-        assert_eq!(interest, scale_f64(0.07, Perpetuals::USD_DECIMALS));
+        assert_eq!(interest, scale_f64(0.056, Perpetuals::USD_DECIMALS));
     }
 }

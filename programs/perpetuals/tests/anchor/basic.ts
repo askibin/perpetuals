@@ -298,7 +298,8 @@ describe("perpetuals", () => {
         lockedAmount: "0",
         weightedLeverage: "0",
         totalLeverage: "0",
-        cumulativeInterestUsd: "0",
+        unrealizedLossUsd: "0",
+        unrealizedProfitUsd: "0",
         cumulativeInterestSnapshot: "0",
       },
       shortPositions: {
@@ -308,7 +309,8 @@ describe("perpetuals", () => {
         lockedAmount: "0",
         weightedLeverage: "0",
         totalLeverage: "0",
-        cumulativeInterestUsd: "0",
+        unrealizedLossUsd: "0",
+        unrealizedProfitUsd: "0",
         cumulativeInterestSnapshot: "0",
       },
       borrowRateState: {
@@ -483,6 +485,7 @@ describe("perpetuals", () => {
 
   it("addCollateral", async () => {
     await tc.addCollateral(
+      126,
       tc.toTokenAmount(1, tc.custodies[0].decimals),
       tc.users[0],
       tc.users[0].tokenAccounts[0],
@@ -493,6 +496,7 @@ describe("perpetuals", () => {
 
   it("removeCollateral", async () => {
     await tc.removeCollateral(
+      126,
       tc.toTokenAmount(1, 6),
       tc.users[0],
       tc.users[0].tokenAccounts[0],

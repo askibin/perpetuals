@@ -5,8 +5,11 @@ use {
         error::PerpetualsError,
         math,
         state::{
-            custody::Custody, oracle::OraclePrice, perpetuals::Perpetuals, pool::Pool,
-            position::Position,
+            custody::Custody,
+            oracle::OraclePrice,
+            perpetuals::Perpetuals,
+            pool::Pool,
+            position::{Position, Side},
         },
     },
     anchor_lang::prelude::*,
@@ -89,7 +92,8 @@ pub struct RemoveCollateral<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct RemoveCollateralParams {
-    collateral_usd: u64,
+    pub price: u64,
+    pub collateral_usd: u64,
 }
 
 pub fn remove_collateral(
@@ -109,7 +113,10 @@ pub fn remove_collateral(
     // validate inputs
     msg!("Validate inputs");
     let position = ctx.accounts.position.as_mut();
-    if params.collateral_usd == 0 || params.collateral_usd >= position.collateral_usd {
+    if params.price == 0
+        || params.collateral_usd == 0
+        || params.collateral_usd >= position.collateral_usd
+    {
         return Err(ProgramError::InvalidArgument.into());
     }
     let pool = ctx.accounts.pool.as_mut();
@@ -156,10 +163,51 @@ pub fn remove_collateral(
     msg!("Amount out: {}", transfer_amount);
 
     // update existing position
+    // changing collateral amount will change position leverage and affect pnl and interest calculations,
+    // we need to save current pnl and interest as unrealized and adjust the position price
     msg!("Update existing position");
+    let (profit_usd, loss_usd, _) = pool.get_pnl_usd(
+        token_id,
+        position,
+        &token_price,
+        &token_ema_price,
+        custody,
+        curtime,
+        false,
+    )?;
+    let interest_amount_usd = custody.get_interest_amount_usd(position, curtime)?;
+
+    let position_price =
+        pool.get_entry_price(&token_price, &token_ema_price, position.side, custody)?;
+    msg!("New position price: {}", position_price);
+
+    if position.side == Side::Long {
+        require_gte!(
+            params.price,
+            position_price,
+            PerpetualsError::MaxPriceSlippage
+        );
+    } else {
+        require_gte!(
+            position_price,
+            params.price,
+            PerpetualsError::MaxPriceSlippage
+        );
+    }
+
+    custody.remove_position(position, curtime)?;
+
     position.update_time = perpetuals.get_time()?;
     position.collateral_usd = math::checked_sub(position.collateral_usd, params.collateral_usd)?;
     position.collateral_amount = math::checked_sub(position.collateral_amount, collateral)?;
+
+    position.unrealized_profit_usd = math::checked_add(position.unrealized_profit_usd, profit_usd)?;
+    position.unrealized_loss_usd = math::checked_add(position.unrealized_loss_usd, loss_usd)?;
+    position.unrealized_loss_usd =
+        math::checked_add(position.unrealized_loss_usd, interest_amount_usd)?;
+    position.cumulative_interest_snapshot = custody.get_cumulative_interest(curtime)?;
+
+    custody.add_position(position, &token_ema_price, curtime)?;
 
     // check position risk
     msg!("Check position risks");
@@ -189,8 +237,6 @@ pub fn remove_collateral(
 
     let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
-
-    custody.remove_collateral(position.side, params.collateral_usd)?;
 
     Ok(())
 }

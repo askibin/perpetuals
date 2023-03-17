@@ -126,7 +126,8 @@ pub struct PositionStats {
     pub locked_amount: u64,
     pub weighted_leverage: u128,
     pub total_leverage: u128,
-    pub cumulative_interest_usd: u64,
+    pub unrealized_loss_usd: u64,
+    pub unrealized_profit_usd: u64,
     pub cumulative_interest_snapshot: u128,
 }
 
@@ -405,7 +406,8 @@ impl Custody {
                 )?)?,
                 size_usd: stats.size_usd,
                 collateral_usd: stats.collateral_usd,
-                unrealized_loss_usd: stats.cumulative_interest_usd,
+                unrealized_loss_usd: stats.unrealized_loss_usd,
+                unrealized_profit_usd: stats.unrealized_profit_usd,
                 cumulative_interest_snapshot: stats.cumulative_interest_snapshot,
                 locked_amount: stats.locked_amount,
                 ..Position::default()
@@ -432,8 +434,12 @@ impl Custody {
             &mut self.short_positions
         };
 
-        stats.cumulative_interest_usd =
-            math::checked_add(stats.cumulative_interest_usd, interest_usd)?;
+        stats.unrealized_profit_usd =
+            math::checked_add(stats.unrealized_profit_usd, position.unrealized_profit_usd)?;
+        stats.unrealized_loss_usd =
+            math::checked_add(stats.unrealized_loss_usd, position.unrealized_loss_usd)?;
+
+        stats.unrealized_loss_usd = math::checked_add(stats.unrealized_loss_usd, interest_usd)?;
         stats.cumulative_interest_snapshot = position.cumulative_interest_snapshot;
 
         stats.open_positions = math::checked_add(stats.open_positions, 1)?;
@@ -488,12 +494,18 @@ impl Custody {
             return Ok(());
         }
 
-        stats.cumulative_interest_usd =
-            math::checked_add(stats.cumulative_interest_usd, interest_usd)?;
-        stats.cumulative_interest_usd = stats
-            .cumulative_interest_usd
+        stats.unrealized_loss_usd = math::checked_add(stats.unrealized_loss_usd, interest_usd)?;
+        stats.unrealized_loss_usd = stats
+            .unrealized_loss_usd
             .saturating_sub(position_interest_usd);
         stats.cumulative_interest_snapshot = cumulative_interest_snapshot;
+
+        stats.unrealized_profit_usd = stats
+            .unrealized_profit_usd
+            .saturating_sub(position.unrealized_profit_usd);
+        stats.unrealized_loss_usd = stats
+            .unrealized_loss_usd
+            .saturating_sub(position.unrealized_loss_usd);
 
         stats.open_positions = math::checked_sub(stats.open_positions, 1)?;
         stats.collateral_usd = math::checked_sub(stats.collateral_usd, position.collateral_usd)?;
@@ -506,30 +518,6 @@ impl Custody {
             math::checked_mul(position.price as u128, leverage)?,
         )?;
         stats.total_leverage = math::checked_sub(stats.total_leverage, leverage)?;
-
-        Ok(())
-    }
-
-    pub fn add_collateral(&mut self, side: Side, collateral_usd: u64) -> Result<()> {
-        let stats = if side == Side::Long {
-            &mut self.long_positions
-        } else {
-            &mut self.short_positions
-        };
-
-        stats.collateral_usd = math::checked_add(stats.collateral_usd, collateral_usd)?;
-
-        Ok(())
-    }
-
-    pub fn remove_collateral(&mut self, side: Side, collateral_usd: u64) -> Result<()> {
-        let stats = if side == Side::Long {
-            &mut self.long_positions
-        } else {
-            &mut self.short_positions
-        };
-
-        stats.collateral_usd = math::checked_sub(stats.collateral_usd, collateral_usd)?;
 
         Ok(())
     }
