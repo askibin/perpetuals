@@ -157,7 +157,8 @@ pub fn remove_collateral(
         custody.pricing.use_ema,
     )?;
 
-    let exit_price = pool.get_exit_price(&token_price, &token_ema_price, position.side, custody)?;
+    let (exit_oracle, exit_price) =
+        pool.get_exit_price(&token_price, &token_ema_price, position.side, custody)?;
     msg!("Exit price: {}", exit_price);
 
     if position.side == Side::Long {
@@ -167,13 +168,13 @@ pub fn remove_collateral(
     }
 
     // compute fee
-    let collateral = token_price.get_token_amount(params.collateral_usd, custody.decimals)?;
+    let collateral = exit_oracle.get_token_amount(params.collateral_usd, custody.decimals)?;
     let fee_amount = pool.get_exit_fee(
         token_id,
         collateral,
         position.size_usd,
         custody,
-        &token_price,
+        &exit_oracle,
     )?;
     msg!("Collected fee: {}", fee_amount);
 
@@ -183,15 +184,6 @@ pub fn remove_collateral(
     }
     let transfer_amount = math::checked_sub(collateral, fee_amount)?;
     msg!("Amount out: {}", transfer_amount);
-
-    // check pool constraints
-    msg!("Check pool constraints");
-    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
-    let withdrawal_amount = math::checked_add(transfer_amount, protocol_fee)?;
-    require!(
-        pool.check_token_ratio(token_id, 0, withdrawal_amount, custody, &token_price)?,
-        PerpetualsError::TokenRatioOutOfRange
-    );
 
     // update existing position
     msg!("Update existing position");
@@ -231,14 +223,7 @@ pub fn remove_collateral(
     // check position risk
     msg!("Check position risks");
     require!(
-        pool.check_leverage(
-            token_id,
-            position,
-            &token_ema_price,
-            custody,
-            curtime,
-            false
-        )?,
+        pool.check_leverage(token_id, position, &token_ema_price, custody, curtime, true)?,
         PerpetualsError::MaxLeverage
     );
 
@@ -260,13 +245,15 @@ pub fn remove_collateral(
     custody.collected_fees.close_position_usd = custody
         .collected_fees
         .close_position_usd
-        .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+        .wrapping_add(token_ema_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
     custody.volume_stats.open_position_usd = custody
         .volume_stats
         .open_position_usd
         .wrapping_sub(params.size_usd);
 
     custody.assets.collateral = math::checked_sub(custody.assets.collateral, collateral)?;
+
+    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     if position.side == Side::Long {

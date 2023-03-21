@@ -167,22 +167,13 @@ pub fn increase_position(
         params.collateral,
         params.size,
         custody,
-        &token_price,
+        &token_ema_price,
     )?;
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
     let transfer_amount = math::checked_add(params.collateral, fee_amount)?;
     msg!("Amount in: {}", transfer_amount);
-
-    // check pool constraints
-    msg!("Check pool constraints");
-    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
-    let deposit_amount = math::checked_sub(transfer_amount, protocol_fee)?;
-    require!(
-        pool.check_token_ratio(token_id, deposit_amount, 0, custody, &token_price)?,
-        PerpetualsError::TokenRatioOutOfRange
-    );
 
     // update existing position
     msg!("Update existing position");
@@ -226,14 +217,7 @@ pub fn increase_position(
     // check position risk
     msg!("Check position risks");
     require!(
-        pool.check_leverage(
-            token_id,
-            position,
-            &token_ema_price,
-            custody,
-            curtime,
-            false
-        )?,
+        pool.check_leverage(token_id, position, &token_ema_price, custody, curtime, true)?,
         PerpetualsError::MaxLeverage
     );
 
@@ -262,6 +246,8 @@ pub fn increase_position(
         .wrapping_add(size_usd);
 
     custody.assets.collateral = math::checked_add(custody.assets.collateral, params.collateral)?;
+
+    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     if position.side == Side::Long {

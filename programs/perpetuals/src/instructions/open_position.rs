@@ -167,22 +167,13 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         params.collateral,
         params.size,
         custody,
-        &token_price,
+        &token_ema_price,
     )?;
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
     let transfer_amount = math::checked_add(params.collateral, fee_amount)?;
     msg!("Amount in: {}", transfer_amount);
-
-    // check pool constraints
-    msg!("Check pool constraints");
-    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
-    let deposit_amount = math::checked_sub(transfer_amount, protocol_fee)?;
-    require!(
-        pool.check_token_ratio(token_id, deposit_amount, 0, custody, &token_price)?,
-        PerpetualsError::TokenRatioOutOfRange
-    );
 
     // init new position
     msg!("Initialize new position");
@@ -242,7 +233,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
     custody.collected_fees.open_position_usd = custody
         .collected_fees
         .open_position_usd
-        .wrapping_add(token_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
+        .wrapping_add(token_ema_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
 
     custody.volume_stats.open_position_usd = custody
         .volume_stats
@@ -250,6 +241,8 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         .wrapping_add(size_usd);
 
     custody.assets.collateral = math::checked_add(custody.assets.collateral, params.collateral)?;
+
+    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     if params.side == Side::Long {
@@ -260,7 +253,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
             math::checked_add(custody.trade_stats.oi_short_usd, size_usd)?;
     }
 
-    custody.add_position(position, &token_price, curtime)?;
+    custody.add_position(position, &token_ema_price, curtime)?;
     custody.update_borrow_rate(curtime)?;
 
     Ok(())
