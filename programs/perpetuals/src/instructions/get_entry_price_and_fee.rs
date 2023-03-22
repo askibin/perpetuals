@@ -82,7 +82,8 @@ pub fn get_entry_price_and_fee(
         custody.pricing.use_ema,
     )?;
 
-    let entry_price = pool.get_entry_price(&token_price, &token_ema_price, params.side, custody)?;
+    let (_, entry_price) =
+        pool.get_entry_price(&token_price, &token_ema_price, params.side, custody)?;
 
     let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
     let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;

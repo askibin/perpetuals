@@ -141,7 +141,7 @@ pub fn increase_position(
         custody.pricing.use_ema,
     )?;
 
-    let position_price =
+    let (_, position_price) =
         pool.get_entry_price(&token_price, &token_ema_price, position.side, custody)?;
     msg!("Entry price: {}", position_price);
 

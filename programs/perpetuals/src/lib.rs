@@ -153,11 +153,11 @@ pub mod perpetuals {
         instructions::increase_position(ctx, &params)
     }
 
-    pub fn remove_collateral(
-        ctx: Context<RemoveCollateral>,
-        params: RemoveCollateralParams,
+    pub fn decrease_position(
+        ctx: Context<DecreasePosition>,
+        params: DecreasePositionParams,
     ) -> Result<()> {
-        instructions::remove_collateral(ctx, &params)
+        instructions::decrease_position(ctx, &params)
     }
 
     pub fn close_position(ctx: Context<ClosePosition>, params: ClosePositionParams) -> Result<()> {

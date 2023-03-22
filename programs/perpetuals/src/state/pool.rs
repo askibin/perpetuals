@@ -100,7 +100,7 @@ impl Pool {
         token_ema_price: &OraclePrice,
         side: Side,
         custody: &Custody,
-    ) -> Result<u64> {
+    ) -> Result<(OraclePrice, u64)> {
         let price = self.get_price(
             token_price,
             token_ema_price,
@@ -112,9 +112,12 @@ impl Pool {
             },
         )?;
 
-        Ok(price
-            .scale_to_exponent(-(Perpetuals::PRICE_DECIMALS as i32))?
-            .price)
+        Ok((
+            price,
+            price
+                .scale_to_exponent(-(Perpetuals::PRICE_DECIMALS as i32))?
+                .price,
+        ))
     }
 
     pub fn get_entry_fee(
@@ -649,6 +652,50 @@ impl Pool {
                     exit_fee,
                 ))
             }
+        }
+    }
+
+    pub fn get_pnl_usd_for_size(
+        &self,
+        position: &Position,
+        token_price: &OraclePrice,
+        token_ema_price: &OraclePrice,
+        custody: &Custody,
+        size_usd: u64,
+    ) -> Result<(u64, u64)> {
+        if size_usd == 0 {
+            return Ok((0, 0));
+        }
+
+        let (_, exit_price) =
+            self.get_exit_price(token_price, token_ema_price, position.side, custody)?;
+
+        let (price_diff_profit, price_diff_loss) = if position.side == Side::Long {
+            if exit_price > position.price {
+                (math::checked_sub(exit_price, position.price)?, 0u64)
+            } else {
+                (0u64, math::checked_sub(position.price, exit_price)?)
+            }
+        } else if exit_price < position.price {
+            (math::checked_sub(position.price, exit_price)?, 0u64)
+        } else {
+            (0u64, math::checked_sub(exit_price, position.price)?)
+        };
+
+        if price_diff_profit > 0 {
+            let profit_usd = math::checked_as_u64(math::checked_div(
+                math::checked_mul(size_usd as u128, price_diff_profit as u128)?,
+                position.price as u128,
+            )?)?;
+
+            Ok((profit_usd, 0u64))
+        } else {
+            let loss_usd = math::checked_as_u64(math::checked_div(
+                math::checked_mul(size_usd as u128, price_diff_loss as u128)?,
+                position.price as u128,
+            )?)?;
+
+            Ok((0u64, loss_usd))
         }
     }
 

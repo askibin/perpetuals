@@ -1,4 +1,4 @@
-//! RemoveCollateral instruction handler
+//! DecreasePosition instruction handler
 
 use {
     crate::{
@@ -18,8 +18,8 @@ use {
 };
 
 #[derive(Accounts)]
-#[instruction(params: RemoveCollateralParams)]
-pub struct RemoveCollateral<'info> {
+#[instruction(params: DecreasePositionParams)]
+pub struct DecreasePosition<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
 
@@ -91,15 +91,15 @@ pub struct RemoveCollateral<'info> {
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
-pub struct RemoveCollateralParams {
+pub struct DecreasePositionParams {
     pub price: u64,
     pub collateral_usd: u64,
     pub size_usd: u64,
 }
 
-pub fn remove_collateral(
-    ctx: Context<RemoveCollateral>,
-    params: &RemoveCollateralParams,
+pub fn decrease_position(
+    ctx: Context<DecreasePosition>,
+    params: &DecreasePositionParams,
 ) -> Result<()> {
     // check permissions
     msg!("Check permissions");
@@ -166,23 +166,43 @@ pub fn remove_collateral(
     } else {
         require_gte!(params.price, exit_price, PerpetualsError::MaxPriceSlippage);
     }
+    custody.remove_position(position, curtime)?;
 
     // compute fee
-    let collateral = exit_oracle.get_token_amount(params.collateral_usd, custody.decimals)?;
+    let (profit_usd, loss_usd) = pool.get_pnl_usd_for_size(
+        position,
+        &token_price,
+        &token_ema_price,
+        custody,
+        params.size_usd,
+    )?;
+    let mut transfer_amount = params.collateral_usd;
+    if profit_usd > 0 {
+        transfer_amount = math::checked_add(transfer_amount, profit_usd)?;
+    } else if loss_usd > 0 {
+        let loss_token = exit_oracle.get_token_amount(loss_usd, custody.decimals)?;
+
+        position.collateral_usd = math::checked_sub(position.collateral_usd, loss_usd)?;
+        position.collateral_amount = math::checked_sub(position.collateral_amount, loss_token)?;
+    }
+
+    let transfer_token_amount = exit_oracle.get_token_amount(transfer_amount, custody.decimals)?;
     let fee_amount = pool.get_exit_fee(
         token_id,
-        collateral,
+        transfer_token_amount,
         position.size_usd,
         custody,
         &exit_oracle,
     )?;
+    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
+
     msg!("Collected fee: {}", fee_amount);
 
     // compute amount to transfer
-    if collateral > position.collateral_amount {
+    let transfer_amount = math::checked_sub(transfer_token_amount, fee_amount)?;
+    if transfer_amount > position.collateral_amount {
         return Err(ProgramError::InsufficientFunds.into());
     }
-    let transfer_amount = math::checked_sub(collateral, fee_amount)?;
     msg!("Amount out: {}", transfer_amount);
 
     // update existing position
@@ -201,9 +221,6 @@ pub fn remove_collateral(
         position.unrealized_loss_usd =
             math::checked_add(position.unrealized_loss_usd, interest_usd)?;
         position.cumulative_interest_snapshot = custody.get_cumulative_interest(curtime)?;
-        // remove position here cause borrow fees collected
-        // will be reopen later
-        custody.remove_position(position, curtime)?;
 
         // (current size * price - removed size * new price) / (current size - removed size)
         position.price = math::checked_as_u64(math::checked_div(
@@ -218,6 +235,8 @@ pub fn remove_collateral(
     }
 
     position.collateral_usd = math::checked_sub(position.collateral_usd, params.collateral_usd)?;
+
+    let collateral = exit_oracle.get_token_amount(params.collateral_usd, custody.decimals)?;
     position.collateral_amount = math::checked_sub(position.collateral_amount, collateral)?;
 
     // check position risk
@@ -246,30 +265,32 @@ pub fn remove_collateral(
         .collected_fees
         .close_position_usd
         .wrapping_add(token_ema_price.get_asset_amount_usd(fee_amount, custody.decimals)?);
-    custody.volume_stats.open_position_usd = custody
+    custody.volume_stats.close_position_usd = custody
         .volume_stats
-        .open_position_usd
+        .close_position_usd
         .wrapping_sub(params.size_usd);
 
+    let amount_lost = transfer_amount.saturating_sub(collateral);
+    custody.assets.owned = math::checked_sub(custody.assets.owned, amount_lost)?;
     custody.assets.collateral = math::checked_sub(custody.assets.collateral, collateral)?;
-
-    let protocol_fee = Pool::get_fee_amount(custody.fees.protocol_share, fee_amount)?;
     custody.assets.protocol_fees = math::checked_add(custody.assets.protocol_fees, protocol_fee)?;
 
     if position.side == Side::Long {
-        custody.trade_stats.oi_long_usd =
-            math::checked_sub(custody.trade_stats.oi_long_usd, params.size_usd)?;
+        custody.trade_stats.oi_long_usd = custody
+            .trade_stats
+            .oi_long_usd
+            .saturating_sub(params.size_usd);
     } else {
-        custody.trade_stats.oi_short_usd =
-            math::checked_sub(custody.trade_stats.oi_short_usd, params.size_usd)?;
+        custody.trade_stats.oi_short_usd = custody
+            .trade_stats
+            .oi_short_usd
+            .saturating_sub(params.size_usd);
     }
 
-    if params.size_usd > 0 {
-        custody.add_position(position, &token_price, curtime)?;
-    } else if params.collateral_usd > 0 {
-        custody.remove_collateral(position.side, params.collateral_usd)?;
-    }
+    custody.trade_stats.profit_usd = custody.trade_stats.profit_usd.wrapping_add(profit_usd);
+    custody.trade_stats.loss_usd = custody.trade_stats.loss_usd.wrapping_add(loss_usd);
 
+    custody.add_position(position, &token_price, curtime)?;
     custody.update_borrow_rate(curtime)?;
 
     Ok(())

@@ -134,7 +134,8 @@ pub fn close_position(ctx: Context<ClosePosition>, params: &ClosePositionParams)
         custody.pricing.use_ema,
     )?;
 
-    let exit_price = pool.get_exit_price(&token_price, &token_ema_price, position.side, custody)?;
+    let (_, exit_price) =
+        pool.get_exit_price(&token_price, &token_ema_price, position.side, custody)?;
     msg!("Exit price: {}", exit_price);
 
     if position.side == Side::Long {
