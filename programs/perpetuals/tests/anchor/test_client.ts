@@ -875,8 +875,10 @@ export class TestClient {
     }
   };
 
-  addCollateral = async (
+  increasePosition = async (
+    price: number,
     collateral: typeof BN,
+    size: typeof BN,
     user,
     fundingAccount: PublicKey,
     positionAccount: PublicKey,
@@ -884,8 +886,10 @@ export class TestClient {
   ) => {
     try {
       await this.program.methods
-        .addCollateral({
+        .increasePosition({
+          price: new BN(price * 1000000),
           collateral,
+          size,
         })
         .accounts({
           owner: user.wallet.publicKey,

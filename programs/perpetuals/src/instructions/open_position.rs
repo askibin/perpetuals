@@ -143,13 +143,7 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
         custody.pricing.use_ema,
     )?;
 
-    let min_price = if token_price < token_ema_price {
-        token_price
-    } else {
-        token_ema_price
-    };
-
-    let position_price =
+    let (_, position_price) =
         pool.get_entry_price(&token_price, &token_ema_price, params.side, custody)?;
     msg!("Entry price: {}", position_price);
 
@@ -183,13 +177,14 @@ pub fn open_position(ctx: Context<OpenPosition>, params: &OpenPositionParams) ->
 
     // init new position
     msg!("Initialize new position");
-    let size_usd = min_price.get_asset_amount_usd(params.size, custody.decimals)?;
-    let collateral_usd = min_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
+    let size_usd = token_price.get_asset_amount_usd(params.size, custody.decimals)?;
+    let collateral_usd = token_price.get_asset_amount_usd(params.collateral, custody.decimals)?;
+    msg!("Collateral added in USD: {}", collateral_usd);
 
     position.owner = ctx.accounts.owner.key();
     position.pool = pool.key();
     position.custody = custody.key();
-    position.open_time = perpetuals.get_time()?;
+    position.open_time = curtime;
     position.update_time = 0;
     position.side = params.side;
     position.price = position_price;

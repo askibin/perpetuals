@@ -146,15 +146,18 @@ pub mod perpetuals {
         instructions::open_position(ctx, &params)
     }
 
-    pub fn add_collateral(ctx: Context<AddCollateral>, params: AddCollateralParams) -> Result<()> {
-        instructions::add_collateral(ctx, &params)
+    pub fn increase_position(
+        ctx: Context<IncreasePosition>,
+        params: IncreasePositionParams,
+    ) -> Result<()> {
+        instructions::increase_position(ctx, &params)
     }
 
-    pub fn remove_collateral(
-        ctx: Context<RemoveCollateral>,
-        params: RemoveCollateralParams,
+    pub fn decrease_position(
+        ctx: Context<DecreasePosition>,
+        params: DecreasePositionParams,
     ) -> Result<()> {
-        instructions::remove_collateral(ctx, &params)
+        instructions::decrease_position(ctx, &params)
     }
 
     pub fn close_position(ctx: Context<ClosePosition>, params: ClosePositionParams) -> Result<()> {
