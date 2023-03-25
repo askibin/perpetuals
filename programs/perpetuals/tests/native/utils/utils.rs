@@ -11,7 +11,7 @@ use {
         math,
         state::{
             custody::{BorrowRateParams, Custody, Fees, PricingParams},
-            perpetuals::Permissions,
+            perpetuals::{Permissions, Perpetuals},
             pool::TokenRatios,
         },
     },
